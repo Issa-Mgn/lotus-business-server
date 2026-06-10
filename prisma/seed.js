@@ -44,7 +44,7 @@ async function main() {
 
   console.log('✅ Admin créé avec succès :');
   console.log(`   Email: ${admin.email}`);
-  console.log(`   Password: admin123`);
+  console.log(`   Password: lot@admin123`);
   console.log(`   Licence: ${admin.license.key}`);
   console.log(`   Type: ${admin.license.type}`);
   console.log(`   Expiration: ${admin.license.endDate.toLocaleDateString()}`);
