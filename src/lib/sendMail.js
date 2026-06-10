@@ -11,6 +11,10 @@ const transporter = require('./mailer');
  */
 async function sendMail(to, subject, html, text = '') {
   try {
+    if (!process.env.MAIL_USER || !process.env.MAIL_APP_PASSWORD) {
+      throw new Error('MAIL_USER ou MAIL_APP_PASSWORD manquant');
+    }
+
     const mailOptions = {
       from: `"Lotus Business" <${process.env.MAIL_USER}>`,
       to,

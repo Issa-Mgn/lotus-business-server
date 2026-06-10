@@ -1,43 +1,35 @@
-// c:\Mes Travaux\Lotus Business\server\src\controllers\adminController.js
-
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const prisma = require('../lib/prisma');
+const { sendMail } = require('../lib/sendMail');
 
-/**
- * Connexion Admin (email + password)
- */
+const publicAdminFields = {
+  id: true,
+  email: true,
+  phone: true,
+  createdAt: true,
+};
+
 const loginAdmin = async (req, res) => {
   try {
     const { email, password } = req.body;
 
     if (!email || !password) {
-      return res.status(400).json({ 
-        error: 'Email et mot de passe requis' 
-      });
+      return res.status(400).json({ error: 'Email et mot de passe requis' });
     }
 
-    // Recherche admin
-    const admin = await prisma.admin.findUnique({
-      where: { email },
-    });
+    const admin = await prisma.admin.findUnique({ where: { email } });
 
     if (!admin) {
-      return res.status(401).json({ 
-        error: 'Identifiants invalides' 
-      });
+      return res.status(401).json({ error: 'Identifiants invalides' });
     }
 
-    // Vérification mot de passe
     const isValid = await bcrypt.compare(password, admin.password);
 
     if (!isValid) {
-      return res.status(401).json({ 
-        error: 'Identifiants invalides' 
-      });
+      return res.status(401).json({ error: 'Identifiants invalides' });
     }
 
-    // Token JWT
     const token = jwt.sign(
       { adminId: admin.id, type: 'admin' },
       process.env.JWT_SECRET,
@@ -59,9 +51,6 @@ const loginAdmin = async (req, res) => {
   }
 };
 
-/**
- * Liste tous les users
- */
 const getAllUsers = async (req, res) => {
   try {
     const users = await prisma.user.findMany({
@@ -78,9 +67,23 @@ const getAllUsers = async (req, res) => {
   }
 };
 
-/**
- * Upgrade user FREE → PREMIUM (1 an)
- */
+const getAllAdmins = async (req, res) => {
+  try {
+    const admins = await prisma.admin.findMany({
+      orderBy: { createdAt: 'desc' },
+      select: publicAdminFields,
+    });
+
+    res.json({
+      count: admins.length,
+      admins,
+    });
+  } catch (error) {
+    console.error('Erreur get admins:', error);
+    res.status(500).json({ error: 'Erreur récupération admins' });
+  }
+};
+
 const upgradeToPremium = async (req, res) => {
   try {
     const { userId } = req.body;
@@ -89,15 +92,12 @@ const upgradeToPremium = async (req, res) => {
       return res.status(400).json({ error: 'userId requis' });
     }
 
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-    });
+    const user = await prisma.user.findUnique({ where: { id: userId } });
 
     if (!user) {
       return res.status(404).json({ error: 'User introuvable' });
     }
 
-    // Nouvelle date d'expiration : 1 an
     const newExpirationDate = new Date();
     newExpirationDate.setFullYear(newExpirationDate.getFullYear() + 1);
 
@@ -121,9 +121,6 @@ const upgradeToPremium = async (req, res) => {
   }
 };
 
-/**
- * Suspendre un user
- */
 const suspendUser = async (req, res) => {
   try {
     const { userId } = req.params;
@@ -143,35 +140,27 @@ const suspendUser = async (req, res) => {
   }
 };
 
-/**
- * Réactiver une licence expirée (admin)
- */
 const reactivateLicense = async (req, res) => {
   try {
-    const { userId, licenseType, duration } = req.body;
+    const { userId, licenseType } = req.body;
 
     if (!userId || !licenseType) {
-      return res.status(400).json({ 
-        error: 'userId et licenseType requis' 
-      });
+      return res.status(400).json({ error: 'userId et licenseType requis' });
     }
 
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-    });
+    const user = await prisma.user.findUnique({ where: { id: userId } });
 
     if (!user) {
       return res.status(404).json({ error: 'User introuvable' });
     }
 
-    // Calculer nouvelle date d'expiration
     const newActivationDate = new Date();
     const newExpirationDate = new Date();
-    
+
     if (licenseType === 'FREE') {
-      newExpirationDate.setMonth(newExpirationDate.getMonth() + 1); // 1 mois
+      newExpirationDate.setMonth(newExpirationDate.getMonth() + 1);
     } else if (licenseType === 'PREMIUM') {
-      newExpirationDate.setFullYear(newExpirationDate.getFullYear() + 1); // 1 an
+      newExpirationDate.setFullYear(newExpirationDate.getFullYear() + 1);
     }
 
     const updatedUser = await prisma.user.update({
@@ -181,8 +170,8 @@ const reactivateLicense = async (req, res) => {
         licenseStatus: 'ACTIVE',
         activationDate: newActivationDate,
         expirationDate: newExpirationDate,
-        isOnline: false, // Forcer reconnexion
-        activeSessionId: null
+        isOnline: false,
+        activeSessionId: null,
       },
     });
 
@@ -196,18 +185,15 @@ const reactivateLicense = async (req, res) => {
   }
 };
 
-/**
- * Forcer la déconnexion d'un user
- */
 const forceLogout = async (req, res) => {
   try {
     const { userId } = req.params;
 
     const user = await prisma.user.update({
       where: { id: userId },
-      data: { 
+      data: {
         isOnline: false,
-        activeSessionId: null 
+        activeSessionId: null,
       },
     });
 
@@ -221,49 +207,34 @@ const forceLogout = async (req, res) => {
   }
 };
 
-/**
- * Créer un nouvel admin (hash automatique du password)
- */
 const createAdmin = async (req, res) => {
   try {
     const { email, phone, password } = req.body;
 
     if (!email || !phone || !password) {
-      return res.status(400).json({ 
-        error: 'Email, téléphone et mot de passe requis' 
-      });
+      return res.status(400).json({ error: 'Email, téléphone et mot de passe requis' });
     }
 
-    // Vérifier si l'admin existe déjà
-    const existingAdmin = await prisma.admin.findUnique({
-      where: { email },
-    });
+    const existingAdmin = await prisma.admin.findUnique({ where: { email } });
 
     if (existingAdmin) {
-      return res.status(400).json({ 
-        error: 'Un admin avec cet email existe déjà' 
-      });
+      return res.status(400).json({ error: 'Un admin avec cet email existe déjà' });
     }
 
-    // Hasher le mot de passe
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Créer l'admin
     const newAdmin = await prisma.admin.create({
       data: {
         email,
         phone,
         password: hashedPassword,
       },
+      select: publicAdminFields,
     });
 
     res.status(201).json({
       message: 'Admin créé avec succès',
-      admin: {
-        id: newAdmin.id,
-        email: newAdmin.email,
-        phone: newAdmin.phone,
-      },
+      admin: newAdmin,
     });
   } catch (error) {
     console.error('Erreur création admin:', error);
@@ -271,12 +242,51 @@ const createAdmin = async (req, res) => {
   }
 };
 
+const testEmail = async (req, res) => {
+  try {
+    const admin = await prisma.admin.findUnique({
+      where: { id: req.userId },
+      select: publicAdminFields,
+    });
+    const to = req.body?.email || admin?.email || process.env.MAIL_USER;
+
+    if (!to) {
+      return res.status(400).json({ error: 'Aucun email destinataire disponible' });
+    }
+
+    const result = await sendMail(
+      to,
+      'Test email Lotus Business',
+      '<p>Le service email Lotus Business fonctionne correctement.</p>',
+      'Le service email Lotus Business fonctionne correctement.'
+    );
+
+    if (!result.success) {
+      return res.status(502).json({
+        error: 'Echec envoi email',
+        detail: result.error,
+      });
+    }
+
+    res.json({
+      message: 'Email de test envoyé',
+      to,
+      messageId: result.messageId,
+    });
+  } catch (error) {
+    console.error('Erreur test email:', error);
+    res.status(500).json({ error: 'Erreur test email' });
+  }
+};
+
 module.exports = {
   loginAdmin,
   getAllUsers,
+  getAllAdmins,
   upgradeToPremium,
   suspendUser,
   reactivateLicense,
   forceLogout,
   createAdmin,
+  testEmail,
 };

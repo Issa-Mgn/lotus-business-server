@@ -4,11 +4,13 @@ const express = require('express');
 const { 
   loginAdmin,
   getAllUsers, 
+  getAllAdmins,
   upgradeToPremium, 
   suspendUser,
   reactivateLicense,
   forceLogout,
-  createAdmin
+  createAdmin,
+  testEmail
 } = require('../controllers/adminController');
 const auth = require('../middlewares/auth');
 const isAdmin = require('../middlewares/isAdmin');
@@ -26,9 +28,11 @@ router.use(auth);
 router.use(isAdmin);
 
 router.get('/users', getAllUsers);
+router.get('/admins', getAllAdmins);
 router.post('/upgrade-premium', upgradeToPremium);
 router.patch('/suspend/:userId', suspendUser);
 router.post('/reactivate-license', reactivateLicense);
 router.post('/force-logout/:userId', forceLogout);
+router.post('/test-email', testEmail);
 
 module.exports = router;

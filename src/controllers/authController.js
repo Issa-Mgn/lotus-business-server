@@ -79,8 +79,12 @@ const register = async (req, res) => {
       'Bienvenue sur Lotus Business 🎉',
       welcomeTemplate(firstName, licenseKey, expirationDate),
       welcomeTemplateText(firstName, licenseKey, expirationDate)
-    ).catch((error) => {
-      console.error('❌ Erreur envoi email (non bloquant):', error);
+    ).then((result) => {
+      if (!result.success) {
+        console.error('Erreur envoi email inscription:', result.error);
+      }
+    }).catch((error) => {
+      console.error('Erreur envoi email inscription:', error);
     });
 
     res.status(201).json({
@@ -233,8 +237,12 @@ const forgotKey = async (req, res) => {
       'Votre clé de licence Lotus Business 🔑',
       welcomeTemplate(user?.firstName || 'Utilisateur', license.key, user?.expirationDate || new Date()),
       welcomeTemplateText(user?.firstName || 'Utilisateur', license.key, user?.expirationDate || new Date())
-    ).catch((error) => {
-      console.error('❌ Erreur envoi email (non bloquant):', error);
+    ).then((result) => {
+      if (!result.success) {
+        console.error('Erreur envoi email forgot-key:', result.error);
+      }
+    }).catch((error) => {
+      console.error('Erreur envoi email forgot-key:', error);
     });
 
     res.json({
@@ -278,3 +286,5 @@ module.exports = {
   logout,
   forgotKey,
 };
+
+
