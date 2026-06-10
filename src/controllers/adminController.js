@@ -221,6 +221,56 @@ const forceLogout = async (req, res) => {
   }
 };
 
+/**
+ * Créer un nouvel admin (hash automatique du password)
+ */
+const createAdmin = async (req, res) => {
+  try {
+    const { email, phone, password } = req.body;
+
+    if (!email || !phone || !password) {
+      return res.status(400).json({ 
+        error: 'Email, téléphone et mot de passe requis' 
+      });
+    }
+
+    // Vérifier si l'admin existe déjà
+    const existingAdmin = await prisma.admin.findUnique({
+      where: { email },
+    });
+
+    if (existingAdmin) {
+      return res.status(400).json({ 
+        error: 'Un admin avec cet email existe déjà' 
+      });
+    }
+
+    // Hasher le mot de passe
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Créer l'admin
+    const newAdmin = await prisma.admin.create({
+      data: {
+        email,
+        phone,
+        password: hashedPassword,
+      },
+    });
+
+    res.status(201).json({
+      message: 'Admin créé avec succès',
+      admin: {
+        id: newAdmin.id,
+        email: newAdmin.email,
+        phone: newAdmin.phone,
+      },
+    });
+  } catch (error) {
+    console.error('Erreur création admin:', error);
+    res.status(500).json({ error: 'Erreur création admin' });
+  }
+};
+
 module.exports = {
   loginAdmin,
   getAllUsers,
@@ -228,4 +278,5 @@ module.exports = {
   suspendUser,
   reactivateLicense,
   forceLogout,
+  createAdmin,
 };
