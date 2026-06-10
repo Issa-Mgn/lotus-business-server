@@ -1,0 +1,62 @@
+// c:\Mes Travaux\Lotus Business\server\prisma\schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Enumérations
+enum LicenseType {
+  FREE
+  PREMIUM
+}
+
+enum LicenseStatus {
+  ACTIVE
+  EXPIRED
+  SUSPENDED
+}
+
+// Table Users (utilisateurs avec toutes leurs infos + licence)
+model User {
+  id              String        @id @default(uuid())
+  email           String        @unique
+  phone           String        @unique
+  firstName       String
+  lastName        String
+  licenseKey      String        @unique
+  licenseType     LicenseType   @default(FREE)
+  licenseStatus   LicenseStatus @default(ACTIVE)
+  activationDate  DateTime      @default(now())
+  expirationDate  DateTime
+  isOnline        Boolean       @default(false)
+  lastLoginAt     DateTime?
+  activeSessionId String?       @unique // Token de session actuelle
+  createdAt       DateTime      @default(now())
+
+  @@map("users")
+}
+
+// Table Admins (administrateurs - ajoutés manuellement)
+model Admin {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  phone     String   @unique
+  password  String   // Hash bcrypt
+  createdAt DateTime @default(now())
+
+  @@map("admins")
+}
+
+// Table Licenses (juste email + clé pour retrouver rapidement)
+model License {
+  id    String @id @default(uuid())
+  email String @unique
+  key   String @unique
+
+  @@map("licenses")
+}
