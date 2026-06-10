@@ -1,4 +1,4 @@
-// c:\Mes Travaux\Lotus Business\server\src\controllers\authController.js
+﻿// c:\Mes Travaux\Lotus Business\server\src\controllers\authController.js
 
 const jwt = require('jsonwebtoken');
 const prisma = require('../lib/prisma');
@@ -7,7 +7,7 @@ const { sendMail } = require('../lib/sendMail');
 const { welcomeTemplate, welcomeTemplateText } = require('../templates/welcome');
 
 /**
- * Inscription User : Génère clé + enregistre dans Users et Licenses
+ * Inscription User : GÃ©nÃ¨re clÃ© + enregistre dans Users et Licenses
  */
 const register = async (req, res) => {
   try {
@@ -20,29 +20,29 @@ const register = async (req, res) => {
       });
     }
 
-    // Vérification email unique
+    // VÃ©rification email unique
     const existingUser = await prisma.user.findUnique({
       where: { email },
     });
 
     if (existingUser) {
       return res.status(400).json({ 
-        error: 'Cet email est déjà utilisé' 
+        error: 'Cet email est dÃ©jÃ  utilisÃ©' 
       });
     }
 
-    // Vérification téléphone unique
+    // VÃ©rification tÃ©lÃ©phone unique
     const existingPhone = await prisma.user.findUnique({
       where: { phone },
     });
 
     if (existingPhone) {
       return res.status(400).json({ 
-        error: 'Ce numéro est déjà utilisé' 
+        error: 'Ce numÃ©ro est dÃ©jÃ  utilisÃ©' 
       });
     }
 
-    // Génération de la clé
+    // GÃ©nÃ©ration de la clÃ©
     const licenseKey = generateLicenseKey();
 
     // Date d'expiration : FREE = 1 mois
@@ -50,7 +50,7 @@ const register = async (req, res) => {
     const expirationDate = new Date();
     expirationDate.setMonth(expirationDate.getMonth() + 1);
 
-    // Création dans Users
+    // CrÃ©ation dans Users
     const user = await prisma.user.create({
       data: {
         email,
@@ -65,7 +65,7 @@ const register = async (req, res) => {
       },
     });
 
-    // Création dans Licenses (pour retrouver rapidement)
+    // CrÃ©ation dans Licenses (pour retrouver rapidement)
     await prisma.license.create({
       data: {
         email,
@@ -73,10 +73,10 @@ const register = async (req, res) => {
       },
     });
 
-    // Envoi email de bienvenue en arrière-plan (ne pas bloquer la réponse)
+    // Envoi email de bienvenue en arriÃ¨re-plan (ne pas bloquer la rÃ©ponse)
     sendMail(
       email,
-      'Bienvenue sur Lotus Business 🎉',
+      'Votre licence Lotus Business',
       welcomeTemplate(firstName, licenseKey, expirationDate),
       welcomeTemplateText(firstName, licenseKey, expirationDate)
     ).then((result) => {
@@ -88,7 +88,7 @@ const register = async (req, res) => {
     });
 
     res.status(201).json({
-      message: 'Inscription réussie ! Votre clé a été envoyée par email.',
+      message: 'Inscription rÃ©ussie ! Votre clÃ© a Ã©tÃ© envoyÃ©e par email.',
       user: {
         id: user.id,
         email: user.email,
@@ -107,30 +107,30 @@ const register = async (req, res) => {
 };
 
 /**
- * Connexion User avec clé de licence + session unique
+ * Connexion User avec clÃ© de licence + session unique
  */
 const login = async (req, res) => {
   try {
     const { licenseKey } = req.body;
 
     if (!licenseKey) {
-      return res.status(400).json({ error: 'Clé de licence requise' });
+      return res.status(400).json({ error: 'ClÃ© de licence requise' });
     }
 
-    // Vérifier les licences expirées d'abord
+    // VÃ©rifier les licences expirÃ©es d'abord
     const { checkExpiredLicenses } = require('../lib/checkExpiredLicenses');
     await checkExpiredLicenses();
 
-    // Recherche du user par sa clé
+    // Recherche du user par sa clÃ©
     const user = await prisma.user.findUnique({
       where: { licenseKey },
     });
 
     if (!user) {
-      return res.status(401).json({ error: 'Clé invalide' });
+      return res.status(401).json({ error: 'ClÃ© invalide' });
     }
 
-    // Vérification expiration (double vérification)
+    // VÃ©rification expiration (double vÃ©rification)
     if (new Date(user.expirationDate) < new Date()) {
       await prisma.user.update({
         where: { id: user.id },
@@ -142,24 +142,24 @@ const login = async (req, res) => {
       });
 
       return res.status(403).json({ 
-        error: 'Votre licence a expiré. Contactez l\'administrateur.' 
+        error: 'Votre licence a expirÃ©. Contactez l\'administrateur.' 
       });
     }
 
-    // Vérification statut
+    // VÃ©rification statut
     if (user.licenseStatus !== 'ACTIVE') {
       return res.status(403).json({ 
         error: `Licence ${user.licenseStatus.toLowerCase()}. Contactez l\'administrateur.` 
       });
     }
 
-    // Vérifier si déjà connecté ailleurs
+    // VÃ©rifier si dÃ©jÃ  connectÃ© ailleurs
     if (user.isOnline && user.activeSessionId) {
-      // Déconnecter l'ancienne session (le token devient invalide)
-      console.log(`🔄 Déconnexion forcée de l'utilisateur ${user.email} (nouvelle connexion)`);
+      // DÃ©connecter l'ancienne session (le token devient invalide)
+      console.log(`ðŸ”„ DÃ©connexion forcÃ©e de l'utilisateur ${user.email} (nouvelle connexion)`);
     }
 
-    // Générer nouveau token de session
+    // GÃ©nÃ©rer nouveau token de session
     const sessionId = require('crypto').randomUUID();
     const token = jwt.sign(
       { 
@@ -171,7 +171,7 @@ const login = async (req, res) => {
       { expiresIn: '7d' }
     );
 
-    // Mettre à jour la session
+    // Mettre Ã  jour la session
     const updatedUser = await prisma.user.update({
       where: { id: user.id },
       data: {
@@ -182,7 +182,7 @@ const login = async (req, res) => {
     });
 
     res.json({
-      message: 'Connexion réussie',
+      message: 'Connexion rÃ©ussie',
       token,
       user: {
         id: updatedUser.id,
@@ -205,7 +205,7 @@ const login = async (req, res) => {
 };
 
 /**
- * Récupération clé par email
+ * RÃ©cupÃ©ration clÃ© par email
  */
 const forgotKey = async (req, res) => {
   try {
@@ -226,7 +226,7 @@ const forgotKey = async (req, res) => {
       });
     }
 
-    // Récupération du user pour le prénom
+    // RÃ©cupÃ©ration du user pour le prÃ©nom
     const user = await prisma.user.findUnique({
       where: { email },
     });
@@ -234,7 +234,7 @@ const forgotKey = async (req, res) => {
     // Renvoi email avec le template
     sendMail(
       email,
-      'Votre clé de licence Lotus Business 🔑',
+      'Votre clé de licence Lotus Business',
       welcomeTemplate(user?.firstName || 'Utilisateur', license.key, user?.expirationDate || new Date()),
       welcomeTemplateText(user?.firstName || 'Utilisateur', license.key, user?.expirationDate || new Date())
     ).then((result) => {
@@ -246,17 +246,17 @@ const forgotKey = async (req, res) => {
     });
 
     res.json({
-      message: 'Clé renvoyée par email',
+      message: 'ClÃ© renvoyÃ©e par email',
       email: email.replace(/(.{2})(.*)(@.*)/, '$1***$3'),
     });
   } catch (error) {
     console.error('Erreur forgot key:', error);
-    res.status(500).json({ error: 'Erreur récupération clé' });
+    res.status(500).json({ error: 'Erreur rÃ©cupÃ©ration clÃ©' });
   }
 };
 
 /**
- * Déconnexion User
+ * DÃ©connexion User
  */
 const logout = async (req, res) => {
   try {
@@ -272,11 +272,11 @@ const logout = async (req, res) => {
     });
 
     res.json({
-      message: 'Déconnexion réussie'
+      message: 'DÃ©connexion rÃ©ussie'
     });
   } catch (error) {
-    console.error('Erreur déconnexion:', error);
-    res.status(500).json({ error: 'Erreur déconnexion' });
+    console.error('Erreur dÃ©connexion:', error);
+    res.status(500).json({ error: 'Erreur dÃ©connexion' });
   }
 };
 
@@ -286,5 +286,7 @@ module.exports = {
   logout,
   forgotKey,
 };
+
+
 
 

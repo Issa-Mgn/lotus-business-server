@@ -10,7 +10,9 @@ const {
   reactivateLicense,
   forceLogout,
   createAdmin,
-  testEmail
+  testEmail,
+  sendManualEmail,
+  sendUserLicenseEmail
 } = require('../controllers/adminController');
 const auth = require('../middlewares/auth');
 const isAdmin = require('../middlewares/isAdmin');
@@ -34,5 +36,7 @@ router.patch('/suspend/:userId', suspendUser);
 router.post('/reactivate-license', reactivateLicense);
 router.post('/force-logout/:userId', forceLogout);
 router.post('/test-email', testEmail);
+router.post('/send-email', sendManualEmail);
+router.post('/send-license-email', sendUserLicenseEmail);
 
 module.exports = router;

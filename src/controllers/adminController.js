@@ -2,12 +2,38 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const prisma = require('../lib/prisma');
 const { sendMail } = require('../lib/sendMail');
+const { welcomeTemplate, welcomeTemplateText } = require('../templates/welcome');
 
 const publicAdminFields = {
   id: true,
   email: true,
   phone: true,
   createdAt: true,
+};
+
+const buildManualEmailHtml = (message) => {
+  const safeMessage = String(message)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/\n/g, '<br>');
+
+  return `
+    <div style="margin:0; padding:0; background:#0A0A0A; font-family:Arial, Helvetica, sans-serif; color:#E5E5E5;">
+      <div style="max-width:560px; margin:0 auto; background:#111111; border:1px solid #2A2A2A; border-radius:14px; overflow:hidden;">
+        <div style="padding:24px 28px; border-bottom:1px solid #2A2A2A;">
+          <p style="margin:0 0 8px 0; color:#6B6B6B; font-size:12px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase;">Lotus Business</p>
+          <h1 style="margin:0; color:#FFFFFF; font-size:22px; line-height:1.3;">Message de l'administration</h1>
+        </div>
+        <div style="padding:28px; color:#D6D6D6; font-size:15px; line-height:1.7;">
+          ${safeMessage}
+        </div>
+        <div style="padding:18px 28px; background:#0F0F0F; border-top:1px solid #2A2A2A;">
+          <p style="margin:0; color:#6B6B6B; font-size:12px; line-height:1.6;">Email envoyé par Lotus Business.</p>
+        </div>
+      </div>
+    </div>
+  `;
 };
 
 const loginAdmin = async (req, res) => {
@@ -279,6 +305,108 @@ const testEmail = async (req, res) => {
   }
 };
 
+const sendManualEmail = async (req, res) => {
+  try {
+    const { recipientType, recipientId, email, subject, message } = req.body;
+
+    if (!subject || !message) {
+      return res.status(400).json({ error: 'Sujet et message requis' });
+    }
+
+    let recipientEmail = email;
+
+    if (!recipientEmail && recipientType === 'user' && recipientId) {
+      const user = await prisma.user.findUnique({
+        where: { id: recipientId },
+        select: { email: true },
+      });
+      recipientEmail = user?.email;
+    }
+
+    if (!recipientEmail && recipientType === 'admin' && recipientId) {
+      const admin = await prisma.admin.findUnique({
+        where: { id: recipientId },
+        select: { email: true },
+      });
+      recipientEmail = admin?.email;
+    }
+
+    if (!recipientEmail) {
+      return res.status(400).json({ error: 'Destinataire introuvable' });
+    }
+
+    const result = await sendMail(
+      recipientEmail,
+      subject,
+      buildManualEmailHtml(message),
+      message
+    );
+
+    if (!result.success) {
+      return res.status(502).json({
+        error: 'Echec envoi email',
+        detail: result.error,
+      });
+    }
+
+    res.json({
+      message: 'Email envoyé',
+      to: recipientEmail,
+      messageId: result.messageId,
+    });
+  } catch (error) {
+    console.error('Erreur envoi email manuel:', error);
+    res.status(500).json({ error: 'Erreur envoi email manuel' });
+  }
+};
+
+const sendUserLicenseEmail = async (req, res) => {
+  try {
+    const { userId } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({ error: 'userId requis' });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        email: true,
+        firstName: true,
+        licenseKey: true,
+        expirationDate: true,
+      },
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'Utilisateur introuvable' });
+    }
+
+    const result = await sendMail(
+      user.email,
+      'Votre licence Lotus Business',
+      welcomeTemplate(user.firstName || 'Utilisateur', user.licenseKey, user.expirationDate),
+      welcomeTemplateText(user.firstName || 'Utilisateur', user.licenseKey, user.expirationDate)
+    );
+
+    if (!result.success) {
+      return res.status(502).json({
+        error: 'Echec envoi email',
+        detail: result.error,
+      });
+    }
+
+    res.json({
+      message: 'Email de licence envoyé',
+      to: user.email,
+      messageId: result.messageId,
+    });
+  } catch (error) {
+    console.error('Erreur envoi email licence:', error);
+    res.status(500).json({ error: 'Erreur envoi email licence' });
+  }
+};
+
 module.exports = {
   loginAdmin,
   getAllUsers,
@@ -289,4 +417,6 @@ module.exports = {
   forceLogout,
   createAdmin,
   testEmail,
+  sendManualEmail,
+  sendUserLicenseEmail,
 };

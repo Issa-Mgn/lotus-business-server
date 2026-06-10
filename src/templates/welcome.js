@@ -255,4 +255,128 @@ Cet email a été envoyé automatiquement, merci de ne pas y répondre.
   `.trim();
 }
 
-module.exports = { welcomeTemplate, welcomeTemplateText };
+function cleanWelcomeTemplate(firstName, licenseKey, endDate) {
+  const formattedDate = new Date(endDate).toLocaleDateString('fr-FR', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
+
+  return `
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Votre licence Lotus Business</title>
+</head>
+<body style="margin:0; padding:0; background:#0A0A0A; font-family:Arial, Helvetica, sans-serif; color:#E5E5E5;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#0A0A0A; padding:32px 16px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px; background:#111111; border:1px solid #2A2A2A; border-radius:14px; overflow:hidden;">
+          <tr>
+            <td style="padding:28px 28px 18px 28px; border-bottom:1px solid #2A2A2A;">
+              <p style="margin:0 0 8px 0; color:#6B6B6B; font-size:12px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase;">Lotus Business</p>
+              <h1 style="margin:0; color:#FFFFFF; font-size:24px; line-height:1.25; font-weight:700;">Votre compte est prêt</h1>
+            </td>
+          </tr>
+
+          <tr>
+            <td style="padding:28px;">
+              <p style="margin:0 0 18px 0; color:#E5E5E5; font-size:16px; line-height:1.7;">Bonjour ${firstName},</p>
+              <p style="margin:0 0 24px 0; color:#BDBDBD; font-size:15px; line-height:1.7;">
+                Votre inscription à Lotus Business a bien été enregistrée. Voici la clé de licence à utiliser pour accéder à votre espace.
+              </p>
+
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:26px 0;">
+                <tr>
+                  <td style="background:#1A1A1A; border:1px solid #2A2A2A; border-radius:12px; padding:22px;">
+                    <p style="margin:0 0 10px 0; color:#6B6B6B; font-size:11px; font-weight:700; letter-spacing:0.1em; text-transform:uppercase;">Clé de licence</p>
+                    <div style="color:#FFFFFF; font-family:Consolas, 'Courier New', monospace; font-size:24px; line-height:1.35; font-weight:700; letter-spacing:1px; word-break:break-all;">
+                      ${licenseKey}
+                    </div>
+                  </td>
+                </tr>
+              </table>
+
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 24px 0;">
+                <tr>
+                  <td style="padding:14px 0; border-bottom:1px solid #2A2A2A;">
+                    <span style="color:#6B6B6B; font-size:13px;">Type de licence</span>
+                    <span style="float:right; color:#3B82F6; font-size:13px; font-weight:700;">FREE</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:14px 0; border-bottom:1px solid #2A2A2A;">
+                    <span style="color:#6B6B6B; font-size:13px;">Statut</span>
+                    <span style="float:right; color:#22C55E; font-size:13px; font-weight:700;">ACTIVE</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:14px 0;">
+                    <span style="color:#6B6B6B; font-size:13px;">Valable jusqu'au</span>
+                    <span style="float:right; color:#FFFFFF; font-size:13px; font-weight:700;">${formattedDate}</span>
+                  </td>
+                </tr>
+              </table>
+
+              <p style="margin:0 0 12px 0; color:#BDBDBD; font-size:14px; line-height:1.7;">
+                Gardez cette clé dans un endroit sûr. Elle est personnelle et permet d'identifier votre licence.
+              </p>
+              <p style="margin:0; color:#6B6B6B; font-size:13px; line-height:1.7;">
+                Si vous perdez votre clé, vous pourrez demander son renvoi depuis l'application.
+              </p>
+            </td>
+          </tr>
+
+          <tr>
+            <td style="padding:20px 28px; background:#0F0F0F; border-top:1px solid #2A2A2A;">
+              <p style="margin:0; color:#6B6B6B; font-size:12px; line-height:1.6;">
+                Cet email est envoyé automatiquement par Lotus Business. Merci de ne pas y répondre.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `;
+}
+
+function cleanWelcomeTemplateText(firstName, licenseKey, endDate) {
+  const formattedDate = new Date(endDate).toLocaleDateString('fr-FR', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
+
+  return `
+Lotus Business
+
+Bonjour ${firstName},
+
+Votre inscription à Lotus Business a bien été enregistrée.
+
+Clé de licence :
+${licenseKey}
+
+Détails de la licence :
+- Type : FREE
+- Statut : ACTIVE
+- Valable jusqu'au : ${formattedDate}
+
+Gardez cette clé dans un endroit sûr. Elle est personnelle et permet d'identifier votre licence.
+
+Si vous perdez votre clé, vous pourrez demander son renvoi depuis l'application.
+
+Cet email est envoyé automatiquement par Lotus Business. Merci de ne pas y répondre.
+  `.trim();
+}
+
+module.exports = {
+  welcomeTemplate: cleanWelcomeTemplate,
+  welcomeTemplateText: cleanWelcomeTemplateText,
+};
