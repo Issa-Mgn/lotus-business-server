@@ -376,6 +376,59 @@ const sendManualEmail = async (req, res) => {
   }
 };
 
+// Debug: envoi manuel sans authentification lorsque DEBUG_ADMIN=1
+const sendManualEmailDebug = async (req, res) => {
+  if (!(process.env.DEBUG_ADMIN === '1' || process.env.DEBUG_ADMIN === 'true')) {
+    return res.status(404).json({ error: 'Not found' });
+  }
+
+  try {
+    const { recipientType, recipientId, email, subject, message } = req.body;
+
+    // Minimal logging
+    try {
+      console.log('[adminController][DEBUG] sendManualEmailDebug called', { recipientType, recipientId, email, subject });
+    } catch (e) {
+      /* ignore */
+    }
+
+    if (!subject || !message) {
+      return res.status(400).json({ error: 'Sujet et message requis' });
+    }
+
+    let recipientEmail = email;
+
+    if (!recipientEmail && recipientType === 'user' && recipientId) {
+      const user = await prisma.user.findUnique({ where: { id: recipientId }, select: { email: true } });
+      recipientEmail = user?.email;
+    }
+
+    if (!recipientEmail && recipientType === 'admin' && recipientId) {
+      const admin = await prisma.admin.findUnique({ where: { id: recipientId }, select: { email: true } });
+      recipientEmail = admin?.email;
+    }
+
+    if (!recipientEmail) {
+      return res.status(400).json({ error: 'Destinataire introuvable' });
+    }
+
+    const html = buildManualEmailHtml(message);
+    try {
+      const result = await mailService.sendCustomEmail(recipientEmail, '', subject, html, message);
+      if (!result.success) {
+        return res.status(502).json({ error: 'Echec envoi email', detail: result });
+      }
+      return res.json({ message: 'Email envoyé (debug)', to: recipientEmail, messageId: result.messageId, data: result.data });
+    } catch (err) {
+      console.error('[adminController][DEBUG] erreur envoi email debug:', err);
+      return res.status(500).json({ error: 'Erreur envoi email debug', detail: err && err.message ? err.message : String(err) });
+    }
+  } catch (error) {
+    console.error('[adminController][DEBUG] sendManualEmailDebug:', error);
+    res.status(500).json({ error: 'Erreur envoi email debug' });
+  }
+};
+
 const sendUserLicenseEmail = async (req, res) => {
   try {
     const { userId } = req.body;

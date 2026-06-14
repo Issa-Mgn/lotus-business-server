@@ -55,14 +55,13 @@ async function sendCustomEmail(toEmail, toName, subject, htmlContent, textConten
     return { success: true, messageId, data: result };
   } catch (error) {
     // Log details for Brevo errors
+    let errorDetail = null;
     try {
       if (error instanceof BrevoError) {
-        console.error('[mailService] BrevoError:', {
-          statusCode: error.statusCode,
-          message: error.message,
-          body: error.body,
-        });
+        errorDetail = { statusCode: error.statusCode, body: error.body };
+        console.error('[mailService] BrevoError:', { statusCode: error.statusCode, message: error.message, body: error.body });
       } else if (error && error.rawResponse) {
+        errorDetail = { rawResponse: error.rawResponse };
         console.error('[mailService] rawResponse:', error.rawResponse);
       }
     } catch (e) {
@@ -70,7 +69,11 @@ async function sendCustomEmail(toEmail, toName, subject, htmlContent, textConten
     }
 
     console.error('[mailService] Erreur envoi email:', error && error.message ? error.message : error);
-    return { success: false, error: (error && error.message) ? error.message : String(error) };
+    return {
+      success: false,
+      error: (error && error.message) ? error.message : String(error),
+      detail: errorDetail,
+    };
   }
 }
 

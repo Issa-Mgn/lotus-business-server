@@ -44,7 +44,17 @@ router.get('/mail-status-debug', (req, res) => {
   return res.status(404).json({ error: 'Not found' });
 });
 
+// Debug send email (public only when DEBUG_ADMIN=1)
+router.post('/send-email-debug', (req, res) => {
+  if (process.env.DEBUG_ADMIN === '1' || process.env.DEBUG_ADMIN === 'true') {
+    const { sendManualEmailDebug } = require('../controllers/adminController');
+    return sendManualEmailDebug(req, res);
+  }
+  return res.status(404).json({ error: 'Not found' });
+});
+
 // Routes protégées admin
+// NOTE: debug routes that are public only when DEBUG_ADMIN=1 are defined above auth in this file.
 router.use(auth);
 router.use(isAdmin);
 
