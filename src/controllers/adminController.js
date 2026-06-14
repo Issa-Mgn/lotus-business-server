@@ -1,8 +1,9 @@
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const prisma = require('../lib/prisma');
-const { sendMail } = require('../lib/sendMail');
 const { welcomeTemplate, welcomeTemplateText } = require('../templates/welcome');
+const mailService = require('../services/mailService');
+const { brevo } = require('../config/mailer');
 
 const publicAdminFields = {
   id: true,
@@ -274,31 +275,31 @@ const testEmail = async (req, res) => {
       where: { id: req.userId },
       select: publicAdminFields,
     });
-    const to = req.body?.email || admin?.email || process.env.MAIL_USER;
+    const to = req.body?.email || admin?.email || process.env.BREVO_SENDER_EMAIL;
 
     if (!to) {
       return res.status(400).json({ error: 'Aucun email destinataire disponible' });
     }
 
-    const result = await sendMail(
-      to,
-      'Test email Lotus Business',
-      '<p>Le service email Lotus Business fonctionne correctement.</p>',
-      'Le service email Lotus Business fonctionne correctement.'
-    );
+    // Envoi via Brevo
+    try {
+      const result = await mailService.sendCustomEmail(
+        to,
+        admin?.email || '',
+        'Test email Lotus Business',
+        '<p>Le service email Lotus Business fonctionne correctement.</p>',
+        'Le service email Lotus Business fonctionne correctement.'
+      );
 
-    if (!result.success) {
-      return res.status(502).json({
-        error: 'Echec envoi email',
-        detail: result.error,
-      });
+      if (!result.success) {
+        return res.status(502).json({ error: 'Echec envoi email', detail: result.error });
+      }
+
+      return res.json({ message: 'Email de test envoyé', to, messageId: result.messageId });
+    } catch (err) {
+      console.error('Erreur test email:', err);
+      return res.status(500).json({ error: 'Erreur test email' });
     }
-
-    res.json({
-      message: 'Email de test envoyé',
-      to,
-      messageId: result.messageId,
-    });
   } catch (error) {
     console.error('Erreur test email:', error);
     res.status(500).json({ error: 'Erreur test email' });
@@ -308,6 +309,26 @@ const testEmail = async (req, res) => {
 const sendManualEmail = async (req, res) => {
   try {
     const { recipientType, recipientId, email, subject, message } = req.body;
+
+    // Trace minimal des requêtes admin pour faciliter le debug
+    try {
+      const debugAdmin = process.env.DEBUG_ADMIN === '1' || process.env.DEBUG_ADMIN === 'true';
+      if (debugAdmin) {
+        console.log('[adminController] sendManualEmail called', {
+          adminId: req.userId,
+          ip: req.ip,
+          recipientType,
+          recipientId,
+          email,
+          subject,
+          hasAuth: !!(req.headers && req.headers.authorization),
+        });
+      } else {
+        console.log(`[adminController] sendManualEmail called by adminId=${req.userId} recipient=${email || recipientId}`);
+      }
+    } catch (e) {
+      console.warn('[adminController] Erreur logging sendManualEmail', e && e.message ? e.message : e);
+    }
 
     if (!subject || !message) {
       return res.status(400).json({ error: 'Sujet et message requis' });
@@ -335,25 +356,20 @@ const sendManualEmail = async (req, res) => {
       return res.status(400).json({ error: 'Destinataire introuvable' });
     }
 
-    const result = await sendMail(
-      recipientEmail,
-      subject,
-      buildManualEmailHtml(message),
-      message
-    );
+    // Envoi via Brevo
+    try {
+      const html = buildManualEmailHtml(message);
+      const result = await mailService.sendCustomEmail(recipientEmail, '', subject, html, message);
 
-    if (!result.success) {
-      return res.status(502).json({
-        error: 'Echec envoi email',
-        detail: result.error,
-      });
+      if (!result.success) {
+        return res.status(502).json({ error: 'Echec envoi email', detail: result.error });
+      }
+
+      return res.json({ message: 'Email envoyé', to: recipientEmail, messageId: result.messageId });
+    } catch (err) {
+      console.error('Erreur envoi email manuel:', err);
+      return res.status(500).json({ error: 'Erreur envoi email manuel' });
     }
-
-    res.json({
-      message: 'Email envoyé',
-      to: recipientEmail,
-      messageId: result.messageId,
-    });
   } catch (error) {
     console.error('Erreur envoi email manuel:', error);
     res.status(500).json({ error: 'Erreur envoi email manuel' });
@@ -363,6 +379,23 @@ const sendManualEmail = async (req, res) => {
 const sendUserLicenseEmail = async (req, res) => {
   try {
     const { userId } = req.body;
+
+    // Logging d'entrée pour debug (activez DEBUG_ADMIN=1)
+    try {
+      const debugAdmin = process.env.DEBUG_ADMIN === '1' || process.env.DEBUG_ADMIN === 'true';
+      if (debugAdmin) {
+        console.log('[adminController] sendUserLicenseEmail called', {
+          adminId: req.userId,
+          ip: req.ip,
+          userId,
+          hasAuth: !!(req.headers && req.headers.authorization),
+        });
+      } else {
+        console.log(`[adminController] sendUserLicenseEmail called by adminId=${req.userId} userId=${userId}`);
+      }
+    } catch (e) {
+      console.warn('[adminController] Erreur logging sendUserLicenseEmail', e && e.message ? e.message : e);
+    }
 
     if (!userId) {
       return res.status(400).json({ error: 'userId requis' });
@@ -382,28 +415,155 @@ const sendUserLicenseEmail = async (req, res) => {
       return res.status(404).json({ error: 'Utilisateur introuvable' });
     }
 
-    const result = await sendMail(
-      user.email,
-      'Votre licence Lotus Business',
-      welcomeTemplate(user.firstName || 'Utilisateur', user.licenseKey, user.expirationDate),
-      welcomeTemplateText(user.firstName || 'Utilisateur', user.licenseKey, user.expirationDate)
-    );
+    try {
+      const result = await mailService.sendLicenseConfirmation(
+        user.email,
+        user.firstName || 'Utilisateur',
+        user.licenseKey,
+        welcomeTemplate(user.firstName || 'Utilisateur', user.licenseKey, user.expirationDate),
+        welcomeTemplateText(user.firstName || 'Utilisateur', user.licenseKey, user.expirationDate)
+      );
 
-    if (!result.success) {
-      return res.status(502).json({
-        error: 'Echec envoi email',
-        detail: result.error,
-      });
+      if (!result.success) {
+        return res.status(502).json({ error: 'Echec envoi email', detail: result.error });
+      }
+
+      return res.json({ message: 'Email de licence envoyé', to: user.email, messageId: result.messageId });
+    } catch (err) {
+      console.error('Erreur envoi email licence:', err);
+      return res.status(500).json({ error: 'Erreur envoi email licence' });
     }
-
-    res.json({
-      message: 'Email de licence envoyé',
-      to: user.email,
-      messageId: result.messageId,
-    });
   } catch (error) {
     console.error('Erreur envoi email licence:', error);
     res.status(500).json({ error: 'Erreur envoi email licence' });
+  }
+};
+
+const getPublishedInfos = async (req, res) => {
+  try {
+    const infos = await prisma.info.findMany({
+      where: { published: true },
+      orderBy: { publishedAt: 'desc' },
+    });
+
+    res.json({
+      count: infos.length,
+      infos,
+    });
+  } catch (error) {
+    console.error('Erreur récupération infos publiques:', error);
+    res.status(500).json({ error: 'Erreur récupération infos' });
+  }
+};
+
+const getAllInfos = async (req, res) => {
+  try {
+    const infos = await prisma.info.findMany({
+      orderBy: { createdAt: 'desc' },
+    });
+
+    res.json({
+      count: infos.length,
+      infos,
+    });
+  } catch (error) {
+    console.error('Erreur récupération infos:', error);
+    res.status(500).json({ error: 'Erreur récupération infos' });
+  }
+};
+
+const mailStatus = async (req, res) => {
+  try {
+    const status = {
+      BREVO_API_KEY: !!process.env.BREVO_API_KEY,
+      BREVO_SENDER_EMAIL: !!process.env.BREVO_SENDER_EMAIL,
+      brevoInitialized: !!brevo,
+    };
+
+    if (!brevo) {
+      return res.json({ status, apiCheck: null, message: 'Brevo client non initialisé' });
+    }
+
+    try {
+      // appel léger pour vérifier la validité de la clé (requiert peu de droit)
+      const result = await brevo.transactionalEmails.getBlockedDomains();
+      return res.json({ status, apiCheck: { ok: true, info: result } });
+    } catch (err) {
+      console.error('[adminController] mailStatus - erreur API Brevo:', err && err.message ? err.message : err);
+      const info = err && err.message ? err.message : String(err);
+      return res.status(502).json({ status, apiCheck: { ok: false, error: info } });
+    }
+  } catch (error) {
+    console.error('[adminController] mailStatus erreur:', error);
+    res.status(500).json({ error: 'Erreur mailStatus' });
+  }
+};
+
+const createInfo = async (req, res) => {
+  try {
+    const { title, content, imageUrl, published = true } = req.body;
+
+    if (!title || !content) {
+      return res.status(400).json({ error: 'Titre et contenu requis' });
+    }
+
+    const info = await prisma.info.create({
+      data: {
+        title,
+        content,
+        imageUrl: imageUrl || null,
+        published: Boolean(published),
+        publishedAt: new Date(),
+      },
+    });
+
+    res.status(201).json({
+      message: 'Info publiée',
+      info,
+    });
+  } catch (error) {
+    console.error('Erreur création info:', error);
+    res.status(500).json({ error: 'Erreur création info' });
+  }
+};
+
+const updateInfo = async (req, res) => {
+  try {
+    const { infoId } = req.params;
+    const { title, content, imageUrl, published } = req.body;
+
+    const info = await prisma.info.update({
+      where: { id: infoId },
+      data: {
+        ...(title !== undefined ? { title } : {}),
+        ...(content !== undefined ? { content } : {}),
+        ...(imageUrl !== undefined ? { imageUrl: imageUrl || null } : {}),
+        ...(published !== undefined ? { published: Boolean(published) } : {}),
+      },
+    });
+
+    res.json({
+      message: 'Info mise à jour',
+      info,
+    });
+  } catch (error) {
+    console.error('Erreur mise à jour info:', error);
+    res.status(500).json({ error: 'Erreur mise à jour info' });
+  }
+};
+
+const deleteInfo = async (req, res) => {
+  try {
+    const { infoId } = req.params;
+
+    await prisma.info.delete({
+      where: { id: infoId },
+    });
+
+    res.json({ message: 'Info supprimée' });
+  } catch (error) {
+    console.error('Erreur suppression info:', error);
+    res.status(500).json({ error: 'Erreur suppression info' });
   }
 };
 
@@ -419,4 +579,10 @@ module.exports = {
   testEmail,
   sendManualEmail,
   sendUserLicenseEmail,
+  mailStatus,
+  getPublishedInfos,
+  getAllInfos,
+  createInfo,
+  updateInfo,
+  deleteInfo,
 };

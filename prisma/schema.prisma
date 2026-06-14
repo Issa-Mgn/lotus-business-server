@@ -60,3 +60,16 @@ model License {
 
   @@map("licenses")
 }
+
+model Info {
+  id          String   @id @default(uuid())
+  title       String
+  content     String
+  imageUrl    String?
+  published   Boolean  @default(true)
+  publishedAt DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("infos")
+}

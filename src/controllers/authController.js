@@ -3,7 +3,6 @@
 const jwt = require('jsonwebtoken');
 const prisma = require('../lib/prisma');
 const generateLicenseKey = require('../lib/generateLicenseKey');
-const { sendMail } = require('../lib/sendMail');
 const { welcomeTemplate, welcomeTemplateText } = require('../templates/welcome');
 
 /**
@@ -73,19 +72,25 @@ const register = async (req, res) => {
       },
     });
 
-    // Envoi email de bienvenue en arriÃ¨re-plan (ne pas bloquer la rÃ©ponse)
-    sendMail(
-      email,
-      'Votre licence Lotus Business',
-      welcomeTemplate(firstName, licenseKey, expirationDate),
-      welcomeTemplateText(firstName, licenseKey, expirationDate)
-    ).then((result) => {
-      if (!result.success) {
-        console.error('Erreur envoi email inscription:', result.error);
-      }
-    }).catch((error) => {
-      console.error('Erreur envoi email inscription:', error);
-    });
+    // Envoi email de bienvenue en arrière-plan via Brevo (non bloquant)
+    try {
+      const { sendLicenseConfirmation } = require('../services/mailService');
+      sendLicenseConfirmation(
+        email,
+        firstName,
+        licenseKey,
+        welcomeTemplate(firstName, licenseKey, expirationDate),
+        welcomeTemplateText(firstName, licenseKey, expirationDate)
+      ).then((result) => {
+        if (!result || !result.success) {
+          console.error('Erreur envoi email inscription:', result?.error || 'unknown');
+        }
+      }).catch((error) => {
+        console.error('Erreur envoi email inscription:', error);
+      });
+    } catch (err) {
+      console.error('Erreur require mailService:', err);
+    }
 
     res.status(201).json({
       message: 'Inscription rÃ©ussie ! Votre clÃ© a Ã©tÃ© envoyÃ©e par email.',
@@ -231,19 +236,25 @@ const forgotKey = async (req, res) => {
       where: { email },
     });
 
-    // Renvoi email avec le template
-    sendMail(
-      email,
-      'Votre clé de licence Lotus Business',
-      welcomeTemplate(user?.firstName || 'Utilisateur', license.key, user?.expirationDate || new Date()),
-      welcomeTemplateText(user?.firstName || 'Utilisateur', license.key, user?.expirationDate || new Date())
-    ).then((result) => {
-      if (!result.success) {
-        console.error('Erreur envoi email forgot-key:', result.error);
-      }
-    }).catch((error) => {
-      console.error('Erreur envoi email forgot-key:', error);
-    });
+    // Renvoi email avec le template via Brevo (non bloquant)
+    try {
+      const { sendLicenseRecovery } = require('../services/mailService');
+      sendLicenseRecovery(
+        email,
+        user?.firstName || 'Utilisateur',
+        license.key,
+        welcomeTemplate(user?.firstName || 'Utilisateur', license.key, user?.expirationDate || new Date()),
+        welcomeTemplateText(user?.firstName || 'Utilisateur', license.key, user?.expirationDate || new Date())
+      ).then((result) => {
+        if (!result || !result.success) {
+          console.error('Erreur envoi email forgot-key:', result?.error || 'unknown');
+        }
+      }).catch((error) => {
+        console.error('Erreur envoi email forgot-key:', error);
+      });
+    } catch (err) {
+      console.error('Erreur require mailService:', err);
+    }
 
     res.json({
       message: 'ClÃ© renvoyÃ©e par email',
