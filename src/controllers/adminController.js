@@ -620,6 +620,81 @@ const deleteInfo = async (req, res) => {
   }
 };
 
+/**
+ * Récupérer le profil de l'admin connecté
+ */
+const getProfile = async (req, res) => {
+  try {
+    const adminId = req.userId; // depuis le middleware auth
+
+    const admin = await prisma.admin.findUnique({
+      where: { id: adminId },
+      select: publicAdminFields,
+    });
+
+    if (!admin) {
+      return res.status(404).json({ error: 'Admin introuvable' });
+    }
+
+    res.json({ admin });
+  } catch (error) {
+    console.error('Erreur get profile:', error);
+    res.status(500).json({ error: 'Erreur récupération profil' });
+  }
+};
+
+/**
+ * Changer le mot de passe de l'admin connecté
+ */
+const changePassword = async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    const adminId = req.userId; // depuis le middleware auth
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ 
+        error: 'Mot de passe actuel et nouveau mot de passe requis' 
+      });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({ 
+        error: 'Le nouveau mot de passe doit contenir au moins 6 caractères' 
+      });
+    }
+
+    const admin = await prisma.admin.findUnique({
+      where: { id: adminId },
+    });
+
+    if (!admin) {
+      return res.status(404).json({ error: 'Admin introuvable' });
+    }
+
+    const isValid = await bcrypt.compare(currentPassword, admin.password);
+
+    if (!isValid) {
+      return res.status(401).json({ 
+        error: 'Mot de passe actuel incorrect' 
+      });
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    await prisma.admin.update({
+      where: { id: adminId },
+      data: { password: hashedPassword },
+    });
+
+    res.json({
+      message: 'Mot de passe changé avec succès',
+    });
+  } catch (error) {
+    console.error('Erreur changement mot de passe:', error);
+    res.status(500).json({ error: 'Erreur changement mot de passe' });
+  }
+};
+
 module.exports = {
   loginAdmin,
   getAllUsers,
@@ -638,4 +713,6 @@ module.exports = {
   createInfo,
   updateInfo,
   deleteInfo,
+  getProfile,
+  changePassword,
 };

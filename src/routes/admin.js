@@ -18,7 +18,9 @@ const {
   getAllInfos,
   createInfo,
   updateInfo,
-  deleteInfo
+  deleteInfo,
+  getProfile,
+  changePassword,
 } = require('../controllers/adminController');
 const auth = require('../middlewares/auth');
 const isAdmin = require('../middlewares/isAdmin');
@@ -58,16 +60,27 @@ router.post('/send-email-debug', (req, res) => {
 router.use(auth);
 router.use(isAdmin);
 
+// Profil et paramètres
+router.get('/profile', getProfile);
+router.post('/change-password', changePassword);
+
+// Gestion users
 router.get('/users', getAllUsers);
-router.get('/admins', getAllAdmins);
-router.get('/mail-status', mailStatus);
 router.post('/upgrade-premium', upgradeToPremium);
 router.patch('/suspend/:userId', suspendUser);
 router.post('/reactivate-license', reactivateLicense);
 router.post('/force-logout/:userId', forceLogout);
+
+// Gestion admins
+router.get('/admins', getAllAdmins);
+
+// Emails
+router.get('/mail-status', mailStatus);
 router.post('/test-email', testEmail);
 router.post('/send-email', sendManualEmail);
 router.post('/send-license-email', sendUserLicenseEmail);
+
+// Infos publiques
 router.get('/infos', getAllInfos);
 router.post('/infos', createInfo);
 router.patch('/infos/:infoId', updateInfo);

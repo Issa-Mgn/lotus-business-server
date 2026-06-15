@@ -21,6 +21,24 @@ enum LicenseStatus {
   SUSPENDED
 }
 
+enum NotificationType {
+  LICENSE_EXPIRED
+  LICENSE_EXPIRING_SOON
+  NEW_USER
+  USER_SUSPENDED
+  USER_UPGRADED
+}
+
+enum ActivityType {
+  ADMIN_LOGIN
+  USER_SUSPENDED
+  USER_REACTIVATED
+  LICENSE_UPGRADED
+  ADMIN_CREATED
+  EMAIL_SENT
+  PASSWORD_CHANGED
+}
+
 // Table Users (utilisateurs avec toutes leurs infos + licence)
 model User {
   id              String        @id @default(uuid())
@@ -35,8 +53,11 @@ model User {
   expirationDate  DateTime
   isOnline        Boolean       @default(false)
   lastLoginAt     DateTime?
-  activeSessionId String?       @unique // Token de session actuelle
+  activeSessionId String?       @unique
   createdAt       DateTime      @default(now())
+
+  notifications   Notification[]
+  activityLogs    ActivityLog[]  @relation("ActivityTarget")
 
   @@map("users")
 }
@@ -48,6 +69,8 @@ model Admin {
   phone     String   @unique
   password  String   // Hash bcrypt
   createdAt DateTime @default(now())
+
+  activityLogs ActivityLog[] @relation("ActivityAuthor")
 
   @@map("admins")
 }
@@ -61,15 +84,48 @@ model License {
   @@map("licenses")
 }
 
+// Table Notifications
+model Notification {
+  id        String           @id @default(uuid())
+  type      NotificationType
+  title     String
+  message   String
+  userId    String?
+  user      User?            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  isRead    Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
+  @@map("notifications")
+}
+
+// Table ActivityLog (journal d'activité)
+model ActivityLog {
+  id          String       @id @default(uuid())
+  type        ActivityType
+  description String
+  adminId     String
+  admin       Admin        @relation("ActivityAuthor", fields: [adminId], references: [id], onDelete: Cascade)
+  targetId    String?
+  target      User?        @relation("ActivityTarget", fields: [targetId], references: [id], onDelete: SetNull)
+  metadata    String?      // JSON stringifié pour données supplémentaires
+  ipAddress   String?
+  createdAt   DateTime     @default(now())
+
+  @@map("activity_logs")
+}
+
 model Info {
-  id          String   @id @default(uuid())
-  title       String
-  content     String
-  imageUrl    String?
-  published   Boolean  @default(true)
-  publishedAt DateTime @default(now())
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id             String   @id @default(uuid())
+  title          String
+  content        String
+  imageUrl       String?
+  imageFileId    String?  // ImageKit file ID pour suppression
+  imageFilePath  String?  // ImageKit file path
+  thumbnailUrl   String?  // ImageKit thumbnail URL
+  published      Boolean  @default(true)
+  publishedAt    DateTime @default(now())
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   @@map("infos")
 }
