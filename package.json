@@ -11,6 +11,7 @@
     "test:db": "node test-supabase-connection.js",
     "test:keys": "node test-license-key.js",
     "test:email": "node test-email.js",
+    "test:imagekit": "node test-imagekit.js",
     "create:admin": "node create-admin-hash.js",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
@@ -34,6 +35,7 @@
     "express": "^4.18.2",
     "imagekit": "^6.0.0",
     "jsonwebtoken": "^9.0.2",
+    "nodemailer": "^9.0.0",
     "uuid": "^14.0.0"
   },
   "devDependencies": {

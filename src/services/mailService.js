@@ -78,12 +78,12 @@ async function sendCustomEmail(toEmail, toName, subject, htmlContent, textConten
 }
 
 async function sendLicenseConfirmation(toEmail, toName, licenseKey, htmlContent, textContent = '') {
-  const subject = 'Votre licence Lotus Business';
+  const subject = 'Bienvenue sur Lotus Business 🎉';
   return sendCustomEmail(toEmail, toName, subject, htmlContent, textContent);
 }
 
 async function sendLicenseRecovery(toEmail, toName, licenseKey, htmlContent, textContent = '') {
-  const subject = 'Récupération de votre clé Lotus Business';
+  const subject = 'Récupération de votre clé Lotus Business 🔑';
   return sendCustomEmail(toEmail, toName, subject, htmlContent, textContent);
 }
 

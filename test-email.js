@@ -46,10 +46,8 @@ async function testEmail() {
       console.error('Erreur :', result.error);
     }
   } catch (err) {
-    console.error('Erreur require mailService:', err);
+    console.error('❌ Erreur:', err.message);
   }
-
-  console.log('\nTest terminé.');
 
   console.log('\n');
 }

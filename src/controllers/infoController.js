@@ -1,4 +1,4 @@
-const prisma = require('../config/database');
+const prisma = require('../lib/prisma');
 const { uploadImage, deleteImage } = require('../utils/imageUpload');
 
 /**
