@@ -16,12 +16,17 @@ const {
   mailStatus,
   getPublishedInfos,
   getAllInfos,
-  createInfo,
-  updateInfo,
-  deleteInfo,
   getProfile,
   changePassword,
 } = require('../controllers/adminController');
+
+const {
+  createInfo,
+  updateInfo,
+  deleteInfo,
+  getImageKitAuth,
+} = require('../controllers/infoController');
+
 const auth = require('../middlewares/auth');
 const isAdmin = require('../middlewares/isAdmin');
 
@@ -80,10 +85,11 @@ router.post('/test-email', testEmail);
 router.post('/send-email', sendManualEmail);
 router.post('/send-license-email', sendUserLicenseEmail);
 
-// Infos publiques
+// Infos avec ImageKit
 router.get('/infos', getAllInfos);
-router.post('/infos', createInfo);
-router.patch('/infos/:infoId', updateInfo);
-router.delete('/infos/:infoId', deleteInfo);
+router.post('/infos', createInfo); // Utilise infoController avec ImageKit
+router.patch('/infos/:infoId', updateInfo); // Utilise infoController avec ImageKit
+router.delete('/infos/:infoId', deleteInfo); // Utilise infoController avec ImageKit
+router.get('/infos/imagekit-auth', getImageKitAuth); // Auth ImageKit pour upload client
 
 module.exports = router;

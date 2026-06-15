@@ -51,10 +51,14 @@ const createInfo = async (req, res) => {
         imageFilePath: imageData?.filePath || null,
         thumbnailUrl: imageData?.thumbnailUrl || null,
         published: published !== undefined ? published : true,
+        publishedAt: new Date(),
       },
     });
 
-    res.status(201).json({ info });
+    res.status(201).json({ 
+      message: 'Info publiée avec succès',
+      info 
+    });
   } catch (error) {
     console.error('Erreur création info:', error);
     res.status(500).json({ error: 'Erreur serveur' });
