@@ -3,18 +3,21 @@
 const prisma = require('./prisma');
 
 /**
- * Vérifie et met à jour automatiquement les licences expirées
+ * Vérifie et met à jour automatiquement les licences PREMIUM expirées
+ * Note: Les licences FREE n'expirent jamais
  */
 async function checkExpiredLicenses() {
   try {
     const now = new Date();
     
-    // Trouver toutes les licences actives mais expirées
+    // Trouver toutes les licences PREMIUM actives mais expirées
     const expiredUsers = await prisma.user.updateMany({
       where: {
+        licenseType: 'PREMIUM', // Seulement PREMIUM expire
         licenseStatus: 'ACTIVE',
         expirationDate: {
-          lt: now
+          lt: now,
+          not: null // Exclure les null (FREE)
         }
       },
       data: {
@@ -25,7 +28,7 @@ async function checkExpiredLicenses() {
     });
 
     if (expiredUsers.count > 0) {
-      console.log(`⏰ ${expiredUsers.count} licence(s) expirée(s) mise(s) à jour`);
+      console.log(`⏰ ${expiredUsers.count} abonnement(s) PREMIUM expiré(s) mise(s) à jour`);
     }
 
     return expiredUsers.count;

@@ -41,20 +41,21 @@ enum ActivityType {
 
 // Table Users (utilisateurs avec toutes leurs infos + licence)
 model User {
-  id              String        @id @default(uuid())
-  email           String        @unique
-  phone           String        @unique
-  firstName       String
-  lastName        String
-  licenseKey      String        @unique
-  licenseType     LicenseType   @default(FREE)
-  licenseStatus   LicenseStatus @default(ACTIVE)
-  activationDate  DateTime      @default(now())
-  expirationDate  DateTime
-  isOnline        Boolean       @default(false)
-  lastLoginAt     DateTime?
-  activeSessionId String?       @unique
-  createdAt       DateTime      @default(now())
+  id                    String        @id @default(uuid())
+  email                 String        @unique
+  phone                 String        @unique
+  firstName             String
+  lastName              String
+  licenseKey            String        @unique
+  licenseType           LicenseType   @default(FREE)
+  licenseStatus         LicenseStatus @default(ACTIVE)
+  activationDate        DateTime      @default(now())
+  expirationDate        DateTime?     // Nullable - seulement pour PREMIUM
+  isOnline              Boolean       @default(false)
+  lastLoginAt           DateTime?
+  activeSessionId       String?       @unique
+  maxSimultaneousLogins Int           @default(1) // FREE=1, PREMIUM=illimité(999)
+  createdAt             DateTime      @default(now())
 
   notifications   Notification[]
   activityLogs    ActivityLog[]  @relation("ActivityTarget")

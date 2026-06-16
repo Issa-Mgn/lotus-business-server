@@ -1,11 +1,13 @@
 // src/templates/welcome.js
 
-function welcomeTemplate(firstName, licenseKey, endDate) {
-  const formattedDate = new Date(endDate).toLocaleDateString('fr-FR', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  });
+function welcomeTemplate(firstName, licenseKey, endDate, licenseType = 'FREE') {
+  const formattedDate = endDate 
+    ? new Date(endDate).toLocaleDateString('fr-FR', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      })
+    : '♾️ Illimité';
 
   return `
 <!DOCTYPE html>
@@ -25,7 +27,7 @@ function welcomeTemplate(firstName, licenseKey, endDate) {
           <!-- Header -->
           <tr>
             <td style="padding-bottom: 32px; text-align: center;">
-              <img src="https://ik.imagekit.io/81ielaf3a/logo.jpeg" alt="Lotus Business" style="width: 48px; height: 48px; border-radius: 12px;">
+              <img src="https://lotus-txn2.vercel.app/logo.png" alt="Lotus Business" style="width: 64px; height: 64px; border-radius: 12px;">
               <p style="margin: 10px 0 0 0; font-size: 13px; font-weight: 600; color: #111111; letter-spacing: 2px; text-transform: uppercase;">Lotus Business</p>
             </td>
           </tr>
@@ -90,7 +92,7 @@ function welcomeTemplate(firstName, licenseKey, endDate) {
                     <span style="font-size: 13px; color: #111111;">Plan</span>
                   </td>
                   <td style="padding: 14px 20px; text-align: right; border-bottom: 1px solid #111111;">
-                    <span style="font-size: 13px; font-weight: 600; color: #111111;">FREE</span>
+                    <span style="font-size: 13px; font-weight: 600; color: #111111;">${licenseType}</span>
                   </td>
                 </tr>
                 <tr>
@@ -103,7 +105,7 @@ function welcomeTemplate(firstName, licenseKey, endDate) {
                 </tr>
                 <tr>
                   <td style="padding: 14px 20px;">
-                    <span style="font-size: 13px; color: #111111;">Expire le</span>
+                    <span style="font-size: 13px; color: #111111;">Valable jusqu'au</span>
                   </td>
                   <td style="padding: 14px 20px; text-align: right;">
                     <span style="font-size: 13px; font-weight: 600; color: #111111;">${formattedDate}</span>
@@ -158,12 +160,14 @@ function welcomeTemplate(firstName, licenseKey, endDate) {
   `;
 }
 
-function welcomeTemplateText(firstName, licenseKey, endDate) {
-  const formattedDate = new Date(endDate).toLocaleDateString('fr-FR', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  });
+function welcomeTemplateText(firstName, licenseKey, endDate, licenseType = 'FREE') {
+  const formattedDate = endDate 
+    ? new Date(endDate).toLocaleDateString('fr-FR', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      })
+    : '♾️ Illimité';
 
   return `
 LOTUS BUSINESS
@@ -177,9 +181,9 @@ CLÉ DE LICENCE
 ${licenseKey}
 
 DÉTAILS
-Plan     : FREE
-Statut   : Active
-Expire   : ${formattedDate}
+Plan              : ${licenseType}
+Statut            : Active
+Valable jusqu'au  : ${formattedDate}
 
 Important : Cette clé est unique et confidentielle.
 En cas de perte, utilisez "Clé oubliée" depuis l'application.

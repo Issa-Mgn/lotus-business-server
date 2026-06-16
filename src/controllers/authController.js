@@ -44,12 +44,12 @@ const register = async (req, res) => {
     // GÃ©nÃ©ration de la clÃ©
     const licenseKey = generateLicenseKey();
 
-    // Date d'expiration : FREE = 1 mois
+    // FREE = illimité (pas d'expiration), PREMIUM = 1 mois
     const activationDate = new Date();
-    const expirationDate = new Date();
-    expirationDate.setMonth(expirationDate.getMonth() + 1);
+    const expirationDate = null; // FREE n'expire jamais
+    const maxSimultaneousLogins = 1; // FREE = 1 appareil seulement
 
-    // CrÃ©ation dans Users
+    // Création dans Users
     const user = await prisma.user.create({
       data: {
         email,
@@ -61,6 +61,7 @@ const register = async (req, res) => {
         licenseStatus: 'ACTIVE',
         activationDate,
         expirationDate,
+        maxSimultaneousLogins,
       },
     });
 
@@ -83,8 +84,8 @@ const register = async (req, res) => {
         email,
         firstName,
         licenseKey,
-        welcomeTemplate(firstName, licenseKey, expirationDate),
-        welcomeTemplateText(firstName, licenseKey, expirationDate)
+        welcomeTemplate(firstName, licenseKey, expirationDate, 'FREE'),
+        welcomeTemplateText(firstName, licenseKey, expirationDate, 'FREE')
       ).then((result) => {
         if (!result || !result.success) {
           console.error('Erreur envoi email inscription:', result?.error || 'unknown');
@@ -139,20 +140,22 @@ const login = async (req, res) => {
       return res.status(401).json({ error: 'ClÃ© invalide' });
     }
 
-    // VÃ©rification expiration (double vÃ©rification)
-    if (new Date(user.expirationDate) < new Date()) {
-      await prisma.user.update({
-        where: { id: user.id },
-        data: { 
-          licenseStatus: 'EXPIRED',
-          isOnline: false,
-          activeSessionId: null 
-        },
-      });
+    // Vérification expiration (seulement pour PREMIUM)
+    if (user.licenseType === 'PREMIUM' && user.expirationDate) {
+      if (new Date(user.expirationDate) < new Date()) {
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { 
+            licenseStatus: 'EXPIRED',
+            isOnline: false,
+            activeSessionId: null 
+          },
+        });
 
-      return res.status(403).json({ 
-        error: 'Votre licence a expirÃ©. Contactez l\'administrateur.' 
-      });
+        return res.status(403).json({ 
+          error: 'Votre abonnement PREMIUM a expiré. Veuillez renouveler.' 
+        });
+      }
     }
 
     // VÃ©rification statut
@@ -247,8 +250,8 @@ const forgotKey = async (req, res) => {
         email,
         user?.firstName || 'Utilisateur',
         license.key,
-        welcomeTemplate(user?.firstName || 'Utilisateur', license.key, user?.expirationDate || new Date()),
-        welcomeTemplateText(user?.firstName || 'Utilisateur', license.key, user?.expirationDate || new Date())
+        welcomeTemplate(user?.firstName || 'Utilisateur', license.key, user?.expirationDate || null, user?.licenseType || 'FREE'),
+        welcomeTemplateText(user?.firstName || 'Utilisateur', license.key, user?.expirationDate || null, user?.licenseType || 'FREE')
       ).then((result) => {
         if (!result || !result.success) {
           console.error('Erreur envoi email forgot-key:', result?.error || 'unknown');

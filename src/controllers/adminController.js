@@ -125,8 +125,9 @@ const upgradeToPremium = async (req, res) => {
       return res.status(404).json({ error: 'User introuvable' });
     }
 
+    // PREMIUM = 1 mois (5000 FCFA/mois)
     const newExpirationDate = new Date();
-    newExpirationDate.setFullYear(newExpirationDate.getFullYear() + 1);
+    newExpirationDate.setMonth(newExpirationDate.getMonth() + 1);
 
     const updatedUser = await prisma.user.update({
       where: { id: userId },
@@ -135,11 +136,12 @@ const upgradeToPremium = async (req, res) => {
         licenseStatus: 'ACTIVE',
         activationDate: new Date(),
         expirationDate: newExpirationDate,
+        maxSimultaneousLogins: 999, // PREMIUM = connexions illimitées
       },
     });
 
     res.json({
-      message: 'User upgradé en PREMIUM',
+      message: 'User upgradé en PREMIUM (1 mois)',
       user: updatedUser,
     });
   } catch (error) {
@@ -182,12 +184,18 @@ const reactivateLicense = async (req, res) => {
     }
 
     const newActivationDate = new Date();
-    const newExpirationDate = new Date();
+    let newExpirationDate = null;
+    let maxSimultaneousLogins = 1;
 
     if (licenseType === 'FREE') {
-      newExpirationDate.setMonth(newExpirationDate.getMonth() + 1);
+      // FREE = illimité (pas d'expiration)
+      newExpirationDate = null;
+      maxSimultaneousLogins = 1;
     } else if (licenseType === 'PREMIUM') {
-      newExpirationDate.setFullYear(newExpirationDate.getFullYear() + 1);
+      // PREMIUM = 1 mois (5000 FCFA/mois)
+      newExpirationDate = new Date();
+      newExpirationDate.setMonth(newExpirationDate.getMonth() + 1);
+      maxSimultaneousLogins = 999; // Illimité
     }
 
     const updatedUser = await prisma.user.update({
@@ -197,6 +205,7 @@ const reactivateLicense = async (req, res) => {
         licenseStatus: 'ACTIVE',
         activationDate: newActivationDate,
         expirationDate: newExpirationDate,
+        maxSimultaneousLogins,
         isOnline: false,
         activeSessionId: null,
       },
