@@ -64,9 +64,13 @@ const register = async (req, res) => {
       },
     });
 
-    // CrÃ©ation dans Licenses (pour retrouver rapidement)
-    await prisma.license.create({
-      data: {
+    // Création ou mise à jour dans Licenses (upsert pour gérer les réinscriptions)
+    await prisma.license.upsert({
+      where: { email },
+      update: {
+        key: licenseKey,
+      },
+      create: {
         email,
         key: licenseKey,
       },

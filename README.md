@@ -1,6 +1,6 @@
 # 🚀 Lotus Business - Backend API
 
-Backend Node.js/Express pour l'application de gestion de boutique Lotus Business avec système de licences par clé.
+Backend Node.js/Express pour l'application de gestion commerciale Lotus Business avec système de licences par clé.
 
 ---
 
@@ -12,15 +12,9 @@ Backend Node.js/Express pour l'application de gestion de boutique Lotus Business
 - [Configuration](#configuration)
 - [API Endpoints](#api-endpoints)
 - [Système de Licences](#système-de-licences)
-- [Connexion Frontend](#connexion-frontend)
+- [Upload d'Images](#upload-dimages)
 - [Tests](#tests)
-
-## 📄 Fichiers importants
-
-- **`QUICK_START.md`** : Guide de démarrage rapide avec checklist
-- **`POSTMAN_TESTS.md`** : Guide complet de test avec Postman (17 tests)
-- **`create-admin-hash.js`** : Script pour générer un hash bcrypt pour admin
-- **`README.md`** : Documentation complète de l'API
+- [Déploiement](#déploiement)
 
 ---
 
@@ -30,7 +24,8 @@ Backend Node.js/Express pour l'application de gestion de boutique Lotus Business
 - **Prisma ORM** - Gestion de la base de données
 - **Supabase (PostgreSQL)** - Base de données cloud
 - **JWT** - Authentification
-- **Resend** - Envoi d'emails
+- **Brevo** - Envoi d'emails (API HTTP transactionnelle)
+- **ImageKit** - Stockage et gestion d'images
 - **bcrypt** - Hashage des mots de passe (admins)
 - **uuid** - Génération des clés de licence
 
@@ -38,11 +33,14 @@ Backend Node.js/Express pour l'application de gestion de boutique Lotus Business
 
 ## 🏗️ Architecture
 
-### Base de données (3 tables)
+### Base de données
 
 1. **users** : Utilisateurs avec leurs licences intégrées
 2. **admins** : Administrateurs (connexion email/password)
 3. **licenses** : Index rapide email → clé de licence
+4. **infos** : Annonces/informations avec images (ImageKit)
+5. **activities** : Journal d'activité
+6. **notifications** : Notifications système
 
 ### Structure du code
 
@@ -50,23 +48,39 @@ Backend Node.js/Express pour l'application de gestion de boutique Lotus Business
 server/
 ├── src/
 │   ├── lib/
-│   │   ├── prisma.js              # Instance Prisma
-│   │   ├── generateLicenseKey.js  # Générateur LOT-XXXX-xxxx-XXXX
-│   │   └── sendEmail.js           # Service Resend
+│   │   ├── prisma.js                  # Instance Prisma
+│   │   ├── generateLicenseKey.js      # Générateur LOT-XXXX-xxxx-XXXX
+│   │   ├── checkExpiredLicenses.js    # Vérification automatique
+│   │   └── mailer.js                  # (Legacy - remplacé par Brevo)
+│   ├── services/
+│   │   └── mailService.js             # Service email Brevo
+│   ├── templates/
+│   │   └── welcome.js                 # Template email bienvenue
+│   ├── config/
+│   │   ├── mailer.js                  # Configuration Brevo
+│   │   └── imagekit.js                # Configuration ImageKit
+│   ├── utils/
+│   │   └── imageUpload.js             # Fonctions upload ImageKit
 │   ├── middlewares/
-│   │   ├── auth.js                # Vérification JWT
-│   │   └── isAdmin.js             # Vérification rôle admin
+│   │   ├── auth.js                    # Vérification JWT
+│   │   ├── isAdmin.js                 # Vérification rôle admin
+│   │   └── checkLicense.js            # Vérification validité licence
 │   ├── controllers/
-│   │   ├── authController.js      # Inscription/Connexion users
-│   │   └── adminController.js     # Gestion admin
+│   │   ├── authController.js          # Inscription/Connexion users
+│   │   ├── adminController.js         # Gestion admin
+│   │   └── infoController.js          # Gestion infos + ImageKit
 │   ├── routes/
-│   │   ├── auth.js                # Routes publiques
-│   │   └── admin.js               # Routes admin protégées
-│   └── app.js                     # Point d'entrée
+│   │   ├── auth.js                    # Routes publiques
+│   │   ├── admin.js                   # Routes admin protégées
+│   │   ├── activity.js                # Routes activités
+│   │   └── notifications.js           # Routes notifications
+│   └── app.js                         # Point d'entrée
 ├── prisma/
-│   ├── schema.prisma              # Schéma DB
-│   └── seed.js                    # Données de test
-└── .env                           # Variables d'environnement
+│   ├── schema.prisma                  # Schéma DB
+│   └── seed.js                        # Données de test
+├── test-email.js                      # Script test email
+├── test-imagekit.js                   # Script test ImageKit
+└── .env                               # Variables d'environnement
 ```
 
 ---
@@ -85,32 +99,44 @@ npm install
 Créer un fichier `.env` :
 
 ```env
-DATABASE_URL="postgresql://postgres.xxx:password@aws-0-eu-west-2.pooler.supabase.com:6543/postgres"
+# Base de données
+DATABASE_URL="postgresql://postgres.xxx:password@aws-0-eu-west-2.pooler.supabase.com:6543/postgres?pgbouncer=true"
+DIRECT_URL="postgresql://postgres.xxx:password@aws-0-eu-west-2.pooler.supabase.com:5432/postgres"
+
+# JWT
 JWT_SECRET="votre_secret_jwt_genere"
+
+# Email - Brevo
 BREVO_API_KEY="xkeysib-votre_cle_brevo"
 BREVO_SENDER_EMAIL="noreply@lotusbusiness.com"
+BREVO_SENDER_NAME="Lotus Business"
+
+# ImageKit
+IMAGEKIT_PRIVATE_KEY="private_xxx"
+IMAGEKIT_PUBLIC_KEY="public_xxx"
+IMAGEKIT_URL_ENDPOINT="https://ik.imagekit.io/xxx"
+
+# Serveur
 PORT=5000
 NODE_ENV="development"
+
+# Debug (optionnel)
+DEBUG_ADMIN=1
+DEBUG_MAIL=1
 ```
 
 **Générer un JWT_SECRET :**
 ```bash
-node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
+node -e "console.log(require('crypto').randomBytes(64).toString('base64'))"
 ```
 
-### 3. Configurer Supabase
-
-1. Créer un projet sur [supabase.com](https://supabase.com)
-2. Aller dans **SQL Editor**
-3. Exécuter le script SQL (voir section SQL ci-dessous)
-
-### 4. Initialiser Prisma
+### 3. Configurer Prisma
 
 ```bash
 npm run prisma:generate
 ```
 
-### 5. Démarrer le serveur
+### 4. Démarrer le serveur
 
 ```bash
 npm run dev
@@ -122,71 +148,33 @@ Serveur sur : `http://localhost:5000`
 
 ## ⚙️ Configuration
 
-### Supabase - Script SQL
-
-Exécuter dans le SQL Editor de Supabase :
-
-```sql
--- Supprimer les anciennes tables
-DROP TABLE IF EXISTS "licenses" CASCADE;
-DROP TABLE IF EXISTS "admins" CASCADE;
-DROP TABLE IF EXISTS "users" CASCADE;
-DROP TYPE IF EXISTS "LicenseType" CASCADE;
-DROP TYPE IF EXISTS "LicenseStatus" CASCADE;
-
--- Créer les types enum
-CREATE TYPE "LicenseType" AS ENUM ('FREE', 'PREMIUM');
-CREATE TYPE "LicenseStatus" AS ENUM ('ACTIVE', 'EXPIRED', 'SUSPENDED');
-
--- Table Users
-CREATE TABLE "users" (
-  "id" TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
-  "email" TEXT UNIQUE NOT NULL,
-  "phone" TEXT UNIQUE NOT NULL,
-  "firstName" TEXT NOT NULL,
-  "lastName" TEXT NOT NULL,
-  "licenseKey" TEXT UNIQUE NOT NULL,
-  "licenseType" "LicenseType" DEFAULT 'FREE' NOT NULL,
-  "licenseStatus" "LicenseStatus" DEFAULT 'ACTIVE' NOT NULL,
-  "activationDate" TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
-  "expirationDate" TIMESTAMP NOT NULL,
-  "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
-);
-
--- Table Admins
-CREATE TABLE "admins" (
-  "id" TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
-  "email" TEXT UNIQUE NOT NULL,
-  "phone" TEXT UNIQUE NOT NULL,
-  "password" TEXT NOT NULL,
-  "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
-);
-
--- Table Licenses
-CREATE TABLE "licenses" (
-  "id" TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
-  "email" TEXT UNIQUE NOT NULL,
-  "key" TEXT UNIQUE NOT NULL
-);
-
--- Index
-CREATE INDEX "users_email_idx" ON "users"("email");
-CREATE INDEX "users_licenseKey_idx" ON "users"("licenseKey");
-CREATE INDEX "licenses_email_idx" ON "licenses"("email");
-```
-
 ### Brevo (Envoi d'emails)
 
 1. Créer un compte sur [brevo.com](https://www.brevo.com)
 2. Aller dans **Settings** → **SMTP & API**
 3. Créer une nouvelle **API Key**
-4. Copier la clé dans `.env`
+4. Copier la clé dans `.env` comme `BREVO_API_KEY`
 
 **Avantages de Brevo :**
 - ✅ 300 emails gratuits par jour
+- ✅ API HTTP (pas de blocage SMTP)
 - ✅ Pas de vérification de domaine requise
-- ✅ Emails envoyés à n'importe quelle adresse
 - ✅ Idéal pour développement et production
+
+### ImageKit (Stockage d'images)
+
+1. Créer un compte sur [imagekit.io](https://imagekit.io)
+2. Aller dans **Settings** → **API Keys**
+3. Copier :
+   - **Public Key** → `IMAGEKIT_PUBLIC_KEY`
+   - **Private Key** → `IMAGEKIT_PRIVATE_KEY`
+   - **URL Endpoint** → `IMAGEKIT_URL_ENDPOINT`
+
+**Avantages d'ImageKit :**
+- ✅ 20GB de stockage gratuit
+- ✅ CDN mondial intégré
+- ✅ Optimisation automatique des images
+- ✅ Transformations d'images à la volée
 
 ---
 
@@ -194,7 +182,8 @@ CREATE INDEX "licenses_email_idx" ON "licenses"("email");
 
 ### Base URL
 ```
-http://localhost:5000
+Production: https://lotus-business-server.onrender.com/api
+Local: http://localhost:5000/api
 ```
 
 ### 📍 Routes Users (Public)
@@ -202,7 +191,7 @@ http://localhost:5000
 #### 1. Inscription
 
 ```http
-POST /api/auth/register
+POST /auth/register
 Content-Type: application/json
 
 {
@@ -226,15 +215,14 @@ Content-Type: application/json
     "licenseKey": "LOT-1234-abcd-5678",
     "licenseType": "FREE",
     "expirationDate": "2026-07-09T..."
-  },
-  "emailSent": true
+  }
 }
 ```
 
 #### 2. Connexion
 
 ```http
-POST /api/auth/login
+POST /auth/login
 Content-Type: application/json
 
 {
@@ -242,29 +230,10 @@ Content-Type: application/json
 }
 ```
 
-**Réponse :**
-```json
-{
-  "message": "Connexion réussie",
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "user": {
-    "id": "uuid",
-    "email": "user@example.com",
-    "phone": "+221771234567",
-    "firstName": "Jean",
-    "lastName": "Dupont",
-    "licenseKey": "LOT-1234-abcd-5678",
-    "licenseType": "FREE",
-    "licenseStatus": "ACTIVE",
-    "expirationDate": "2026-07-09T..."
-  }
-}
-```
-
 #### 3. Récupérer sa clé de licence
 
 ```http
-POST /api/auth/forgot-key
+POST /auth/forgot-key
 Content-Type: application/json
 
 {
@@ -272,67 +241,51 @@ Content-Type: application/json
 }
 ```
 
-**Réponse :**
-```json
-{
-  "message": "Clé renvoyée par email",
-  "email": "us***@example.com"
-}
-```
-
 ---
 
 ### 🔐 Routes Admin (Protégées)
 
-#### 1. Connexion Admin
-
+Toutes les routes admin nécessitent un header :
 ```http
-POST /api/admin/login
-Content-Type: application/json
-
-{
-  "email": "admin@example.com",
-  "password": "password123"
-}
+Authorization: Bearer {admin_token}
 ```
 
-**Réponse :**
+#### Gestion des utilisateurs
+
+```http
+GET    /admin/users                    # Liste tous les utilisateurs
+POST   /admin/upgrade-premium          # Upgrade user vers PREMIUM
+PATCH  /admin/suspend/:userId          # Suspendre un utilisateur
+POST   /admin/reactivate-license       # Réactiver une licence
+POST   /admin/force-logout/:userId     # Déconnecter un user
+POST   /admin/send-license-email       # Renvoyer email de licence
+```
+
+#### Gestion des infos (avec ImageKit)
+
+```http
+GET    /admin/infos                    # Liste toutes les infos
+POST   /admin/infos                    # Créer info avec image
+PATCH  /admin/infos/:infoId            # Modifier info
+DELETE /admin/infos/:infoId            # Supprimer info + image
+GET    /admin/infos/imagekit-auth      # Auth ImageKit pour client
+```
+
+**Exemple création d'info avec image :**
 ```json
 {
-  "message": "Connexion admin réussie",
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "admin": {
-    "id": "uuid",
-    "email": "admin@example.com",
-    "phone": "+221771234567"
-  }
+  "title": "Nouvelle promotion",
+  "content": "Description de la promotion...",
+  "imageBase64": "data:image/jpeg;base64,/9j/4AAQ...",
+  "published": true
 }
 ```
 
-#### 2. Liste des utilisateurs
+#### Profil et paramètres
 
 ```http
-GET /api/admin/users
-Authorization: Bearer {token}
-```
-
-#### 3. Upgrade user vers PREMIUM
-
-```http
-POST /api/admin/upgrade-premium
-Authorization: Bearer {token}
-Content-Type: application/json
-
-{
-  "userId": "uuid"
-}
-```
-
-#### 4. Suspendre un user
-
-```http
-PATCH /api/admin/suspend/{userId}
-Authorization: Bearer {token}
+GET    /admin/profile                  # Profil de l'admin connecté
+POST   /admin/change-password          # Changer le mot de passe
 ```
 
 ---
@@ -349,7 +302,7 @@ Authorization: Bearer {token}
 ### Statuts
 
 - **ACTIVE** : Licence valide
-- **EXPIRED** : Licence expirée (vérifié à chaque login)
+- **EXPIRED** : Licence expirée (vérifié automatiquement)
 - **SUSPENDED** : Licence suspendue par admin
 
 ### Format des clés
@@ -362,118 +315,83 @@ Authorization: Bearer {token}
 
 Exemple : `LOT-8248-izri-8239`
 
+### Vérification automatique
+
+Le serveur vérifie automatiquement les licences expirées **toutes les heures** et au démarrage.
+
 ---
 
-## 🔗 Connexion Frontend
+## 📸 Upload d'Images
 
-### Configuration CORS
+### Architecture
 
-Le serveur accepte les requêtes de tous les domaines. Pour restreindre en production, modifier `src/app.js` :
+Le système utilise **ImageKit** pour le stockage et la gestion des images :
 
-```javascript
-app.use(cors({
-  origin: 'https://votre-frontend.com'
-}));
+1. **Frontend** : Convertit l'image en base64
+2. **Backend** : Upload vers ImageKit via API
+3. **ImageKit** : Stockage + CDN + optimisation
+4. **Base de données** : Stocke l'URL de l'image
+
+### Flow complet
+
+```
+┌─────────────┐      base64      ┌─────────────┐
+│  Dashboard  │ ───────────────> │   Backend   │
+└─────────────┘                  └─────────────┘
+                                        │
+                                        │ uploadImage()
+                                        ↓
+                                 ┌─────────────┐
+                                 │  ImageKit   │
+                                 └─────────────┘
+                                        │
+                                        │ URL
+                                        ↓
+                                 ┌─────────────┐
+                                 │  Database   │
+                                 └─────────────┘
 ```
 
-### Authentification Frontend
+### Tester ImageKit
 
-#### 1. Inscription User
-
-```javascript
-const response = await fetch('http://localhost:5000/api/auth/register', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({
-    email: 'user@example.com',
-    phone: '+221771234567',
-    firstName: 'Jean',
-    lastName: 'Dupont'
-  })
-});
-
-const data = await response.json();
-console.log(data.user.licenseKey); // Afficher la clé
+```bash
+npm run test:imagekit
 ```
 
-#### 2. Connexion avec clé
-
-```javascript
-const response = await fetch('http://localhost:5000/api/auth/login', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({
-    licenseKey: 'LOT-1234-abcd-5678'
-  })
-});
-
-const data = await response.json();
-localStorage.setItem('token', data.token);
-localStorage.setItem('user', JSON.stringify(data.user));
-```
-
-#### 3. Requêtes protégées
-
-```javascript
-const token = localStorage.getItem('token');
-
-const response = await fetch('http://localhost:5000/api/admin/users', {
-  method: 'GET',
-  headers: {
-    'Authorization': `Bearer ${token}`,
-    'Content-Type': 'application/json'
-  }
-});
-```
-
-#### 4. Vérification expiration licence
-
-```javascript
-const user = JSON.parse(localStorage.getItem('user'));
-const expirationDate = new Date(user.expirationDate);
-const now = new Date();
-
-if (expirationDate < now) {
-  alert('Votre licence a expiré. Veuillez renouveler.');
-  // Rediriger vers page upgrade
-}
-```
+Ce script :
+- ✅ Vérifie les variables d'environnement
+- ✅ Upload une image de test
+- ✅ Affiche l'URL
+- ✅ Supprime l'image de test
 
 ---
 
 ## 🧪 Tests
 
-### Postman
+### Scripts de test disponibles
 
-Importer la collection depuis `thunder-tests/` ou tester manuellement :
-
-1. **Register** : `POST /api/auth/register`
-2. **Login** : `POST /api/auth/login`
-3. Copier le `token`
-4. **Get Users** (admin) : `GET /api/admin/users` avec header `Authorization: Bearer {token}`
-
-### Créer un admin manuellement
-
-Exécuter dans Supabase SQL Editor :
-
-```sql
-INSERT INTO "admins" ("id", "email", "phone", "password", "createdAt")
-VALUES (
-  gen_random_uuid()::text,
-  'admin@lotusbusiness.com',
-  '+221771111111',
-  '$2b$10$YourHashedPasswordHere', -- Hash bcrypt de "admin123"
-  CURRENT_TIMESTAMP
-);
+```bash
+npm run test:email      # Test envoi email Brevo
+npm run test:imagekit   # Test upload ImageKit
+npm run test:db         # Test connexion Supabase
+npm run test:keys       # Test générateur de clés
 ```
 
-Pour générer un hash bcrypt :
+### Test email
 
-```javascript
-const bcrypt = require('bcrypt');
-const hash = await bcrypt.hash('admin123', 10);
-console.log(hash);
+```bash
+npm run test:email
 ```
+
+Envoie un email de test à l'adresse configurée dans `BREVO_SENDER_EMAIL`.
+
+### Test ImageKit
+
+```bash
+npm run test:imagekit
+```
+
+Upload et supprime une image de test.
 
 ---
 
@@ -485,52 +403,93 @@ console.log(hash);
 | `npm start` | Démarrer en production |
 | `npm run prisma:generate` | Générer le client Prisma |
 | `npm run prisma:studio` | Ouvrir Prisma Studio |
-| `npm run test:keys` | Tester le générateur de clés |
-
----
-
-## 🐛 Dépannage
-
-### Erreur : "API key is invalid" (Brevo)
-
-- Vérifier que `BREVO_API_KEY` est correct dans `.env`
-- La clé doit commencer par `xkeysib-`
-- Créer une nouvelle clé sur https://app.brevo.com/settings/keys/api
-
-### Erreur : "Can't reach database server"
-
-- Vérifier `DATABASE_URL` dans `.env`
-- Vérifier que le projet Supabase est actif
-
-### Erreur : "Column does not exist"
-
-```bash
-npm run prisma:generate
-```
+| `npm run test:email` | Tester l'envoi d'emails |
+| `npm run test:imagekit` | Tester ImageKit |
 
 ---
 
 ## 🚀 Déploiement Production
 
-### Variables d'environnement
+### Render.com
 
-Configurer sur votre plateforme (Heroku, Vercel, Railway, etc.) :
+#### 1. Variables d'environnement
+
+Configurer dans Render Dashboard :
 
 ```env
-DATABASE_URL=...
+DATABASE_URL=postgresql://...
+DIRECT_URL=postgresql://...
 JWT_SECRET=...
-BREVO_API_KEY=...
+BREVO_API_KEY=xkeysib-...
 BREVO_SENDER_EMAIL=noreply@lotusbusiness.com
+BREVO_SENDER_NAME=Lotus Business
+IMAGEKIT_PRIVATE_KEY=private_...
+IMAGEKIT_PUBLIC_KEY=public_...
+IMAGEKIT_URL_ENDPOINT=https://ik.imagekit.io/...
 PORT=5000
 NODE_ENV=production
 ```
 
-### Commandes de build
+#### 2. Build Command
 
 ```bash
+npm install && npx prisma generate
+```
+
+#### 3. Start Command
+
+```bash
+node src/app.js
+```
+
+### Vérifications post-déploiement
+
+1. ✅ Tester la route de santé : `GET https://votre-api.onrender.com/`
+2. ✅ Tester l'inscription : `POST /api/auth/register`
+3. ✅ Vérifier réception email
+4. ✅ Tester connexion admin : `POST /api/admin/login`
+5. ✅ Tester upload image : `POST /api/admin/infos` avec image base64
+
+---
+
+## 🐛 Dépannage
+
+### Erreur : "Cannot find module '../config/database'"
+
+**Solution :** Ce problème a été corrigé. Le projet utilise `../lib/prisma` au lieu de `../config/database`.
+
+### Erreur : "Cannot find module '../middleware/auth'"
+
+**Solution :** Le dossier s'appelle `middlewares` (pluriel), pas `middleware`. Import corrigé dans tous les fichiers.
+
+### Erreur : "BREVO_API_KEY manquant"
+
+**Solution :** Vérifier que `BREVO_API_KEY` est défini dans `.env` et commence par `xkeysib-`.
+
+### Erreur : "ImageKit upload failed"
+
+**Solution :** Vérifier les 3 variables ImageKit dans `.env` :
+- `IMAGEKIT_PRIVATE_KEY`
+- `IMAGEKIT_PUBLIC_KEY`
+- `IMAGEKIT_URL_ENDPOINT`
+
+### Déploiement Render échoue
+
+**Causes courantes :**
+1. Variables d'environnement manquantes
+2. Build command incorrect
+3. Imports de modules incorrects
+4. Routes non définies
+
+**Vérifier :**
+```bash
+# Tester localement
 npm install
 npm run prisma:generate
-npm start
+node src/app.js
+
+# Vérifier syntaxe
+node --check src/app.js
 ```
 
 ---
