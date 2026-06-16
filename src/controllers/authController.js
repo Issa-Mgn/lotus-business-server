@@ -1,12 +1,11 @@
-﻿// c:\Mes Travaux\Lotus Business\server\src\controllers\authController.js
-
-const jwt = require('jsonwebtoken');
+﻿const jwt = require('jsonwebtoken');
 const prisma = require('../lib/prisma');
 const generateLicenseKey = require('../lib/generateLicenseKey');
 const { welcomeTemplate, welcomeTemplateText } = require('../templates/welcome');
+const getClientIp = require('../lib/getClientIp');
 
 /**
- * Inscription User : GÃ©nÃ¨re clÃ© + enregistre dans Users et Licenses
+ * Inscription User : Génère clé + enregistre dans Users et Licenses
  */
 const register = async (req, res) => {
   try {
@@ -19,29 +18,29 @@ const register = async (req, res) => {
       });
     }
 
-    // VÃ©rification email unique
+    // Vérification email unique
     const existingUser = await prisma.user.findUnique({
       where: { email },
     });
 
     if (existingUser) {
       return res.status(400).json({ 
-        error: 'Cet email est dÃ©jÃ  utilisÃ©' 
+        error: 'Cet email est déjà utilisé' 
       });
     }
 
-    // VÃ©rification tÃ©lÃ©phone unique
+    // Vérification téléphone unique
     const existingPhone = await prisma.user.findUnique({
       where: { phone },
     });
 
     if (existingPhone) {
       return res.status(400).json({ 
-        error: 'Ce numÃ©ro est dÃ©jÃ  utilisÃ©' 
+        error: 'Ce numéro est déjà utilisé' 
       });
     }
 
-    // GÃ©nÃ©ration de la clÃ©
+    // Génération de la clé
     const licenseKey = generateLicenseKey();
 
     // FREE = illimité (pas d'expiration), PREMIUM = 1 mois
@@ -98,7 +97,7 @@ const register = async (req, res) => {
     }
 
     res.status(201).json({
-      message: 'Inscription rÃ©ussie ! Votre clÃ© a Ã©tÃ© envoyÃ©e par email.',
+      message: 'Inscription réussie ! Votre clé a été envoyée par email.',
       user: {
         id: user.id,
         email: user.email,
@@ -117,27 +116,27 @@ const register = async (req, res) => {
 };
 
 /**
- * Connexion User avec clÃ© de licence + session unique
+ * Connexion User avec clé de licence + restriction IP pour FREE
  */
 const login = async (req, res) => {
   try {
     const { licenseKey } = req.body;
 
     if (!licenseKey) {
-      return res.status(400).json({ error: 'ClÃ© de licence requise' });
+      return res.status(400).json({ error: 'Clé de licence requise' });
     }
 
-    // VÃ©rifier les licences expirÃ©es d'abord
+    // Vérifier les licences expirées d'abord
     const { checkExpiredLicenses } = require('../lib/checkExpiredLicenses');
     await checkExpiredLicenses();
 
-    // Recherche du user par sa clÃ©
+    // Recherche du user par sa clé
     const user = await prisma.user.findUnique({
       where: { licenseKey },
     });
 
     if (!user) {
-      return res.status(401).json({ error: 'ClÃ© invalide' });
+      return res.status(401).json({ error: 'Clé invalide' });
     }
 
     // Vérification expiration (seulement pour PREMIUM)
@@ -148,7 +147,8 @@ const login = async (req, res) => {
           data: { 
             licenseStatus: 'EXPIRED',
             isOnline: false,
-            activeSessionId: null 
+            activeSessionId: null,
+            lastLoginIp: null
           },
         });
 
@@ -158,20 +158,40 @@ const login = async (req, res) => {
       }
     }
 
-    // VÃ©rification statut
+    // Vérification statut
     if (user.licenseStatus !== 'ACTIVE') {
       return res.status(403).json({ 
-        error: `Licence ${user.licenseStatus.toLowerCase()}. Contactez l\'administrateur.` 
+        error: `Licence ${user.licenseStatus.toLowerCase()}. Contactez l'administrateur.` 
       });
     }
 
-    // VÃ©rifier si dÃ©jÃ  connectÃ© ailleurs
-    if (user.isOnline && user.activeSessionId) {
-      // DÃ©connecter l'ancienne session (le token devient invalide)
-      console.log(`ðŸ”„ DÃ©connexion forcÃ©e de l'utilisateur ${user.email} (nouvelle connexion)`);
+    // 🔒 RÉCUPÉRER L'IP DU CLIENT ACTUEL
+    const currentIp = getClientIp(req);
+    console.log(`🔐 Tentative de connexion - Email: ${user.email}, Type: ${user.licenseType}, IP: ${currentIp}, IP stockée: ${user.lastLoginIp}, En ligne: ${user.isOnline}`);
+
+    // 🔒 RESTRICTION IP POUR FREE : 1 seul appareil à la fois
+    if (user.licenseType === 'FREE') {
+      // Si déjà connecté avec une autre IP, refuser la connexion
+      if (user.isOnline && user.lastLoginIp && user.lastLoginIp !== currentIp) {
+        console.log(`❌ Connexion refusée FREE - IP différente détectée`);
+        return res.status(403).json({ 
+          error: 'Compte FREE déjà connecté sur un autre appareil. Déconnectez-vous d\'abord ou passez à PREMIUM pour connexions illimitées.' 
+        });
+      }
     }
 
-    // GÃ©nÃ©rer nouveau token de session
+    // ✅ PREMIUM : Pas de restriction IP, connexions illimitées
+    if (user.licenseType === 'PREMIUM') {
+      console.log(`✅ Connexion PREMIUM autorisée - Pas de restriction IP`);
+    }
+
+    // Vérifier si déjà connecté ailleurs
+    if (user.isOnline && user.activeSessionId) {
+      // Déconnecter l'ancienne session (le token devient invalide)
+      console.log(`🔄 Déconnexion forcée de l'utilisateur ${user.email} (nouvelle connexion)`);
+    }
+
+    // Générer nouveau token de session
     const sessionId = require('crypto').randomUUID();
     const token = jwt.sign(
       { 
@@ -183,18 +203,21 @@ const login = async (req, res) => {
       { expiresIn: '7d' }
     );
 
-    // Mettre Ã  jour la session
+    // Mettre à jour la session + IP
     const updatedUser = await prisma.user.update({
       where: { id: user.id },
       data: {
         isOnline: true,
         lastLoginAt: new Date(),
-        activeSessionId: sessionId
+        activeSessionId: sessionId,
+        lastLoginIp: currentIp // 🔒 Enregistrer l'IP pour la vérification FREE
       }
     });
 
+    console.log(`✅ Connexion réussie - ${user.email} (${user.licenseType}) depuis IP: ${currentIp}`);
+
     res.json({
-      message: 'Connexion rÃ©ussie',
+      message: 'Connexion réussie',
       token,
       user: {
         id: updatedUser.id,
@@ -217,7 +240,7 @@ const login = async (req, res) => {
 };
 
 /**
- * RÃ©cupÃ©ration clÃ© par email
+ * Récupération clé par email
  */
 const forgotKey = async (req, res) => {
   try {
@@ -238,7 +261,7 @@ const forgotKey = async (req, res) => {
       });
     }
 
-    // RÃ©cupÃ©ration du user pour le prÃ©nom
+    // Récupération du user pour le prénom
     const user = await prisma.user.findUnique({
       where: { email },
     });
@@ -264,37 +287,38 @@ const forgotKey = async (req, res) => {
     }
 
     res.json({
-      message: 'ClÃ© renvoyÃ©e par email',
+      message: 'Clé renvoyée par email',
       email: email.replace(/(.{2})(.*)(@.*)/, '$1***$3'),
     });
   } catch (error) {
     console.error('Erreur forgot key:', error);
-    res.status(500).json({ error: 'Erreur rÃ©cupÃ©ration clÃ©' });
+    res.status(500).json({ error: 'Erreur récupération clé' });
   }
 };
 
 /**
- * DÃ©connexion User
+ * Déconnexion User
  */
 const logout = async (req, res) => {
   try {
     const userId = req.userId;
 
-    // Marquer comme hors ligne
+    // Marquer comme hors ligne et réinitialiser l'IP pour FREE
     await prisma.user.update({
       where: { id: userId },
       data: {
         isOnline: false,
-        activeSessionId: null
+        activeSessionId: null,
+        // NE PAS réinitialiser lastLoginIp ici - on garde l'historique
       }
     });
 
     res.json({
-      message: 'DÃ©connexion rÃ©ussie'
+      message: 'Déconnexion réussie'
     });
   } catch (error) {
-    console.error('Erreur dÃ©connexion:', error);
-    res.status(500).json({ error: 'Erreur dÃ©connexion' });
+    console.error('Erreur déconnexion:', error);
+    res.status(500).json({ error: 'Erreur déconnexion' });
   }
 };
 
@@ -304,7 +328,3 @@ module.exports = {
   logout,
   forgotKey,
 };
-
-
-
-

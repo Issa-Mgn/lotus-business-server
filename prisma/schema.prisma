@@ -54,6 +54,7 @@ model User {
   isOnline              Boolean       @default(false)
   lastLoginAt           DateTime?
   activeSessionId       String?       @unique
+  lastLoginIp           String?       // IP du dernier appareil connecté
   maxSimultaneousLogins Int           @default(1) // FREE=1, PREMIUM=illimité(999)
   createdAt             DateTime      @default(now())
 

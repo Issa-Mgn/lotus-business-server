@@ -13,6 +13,7 @@
     "test:email": "node test-email.js",
     "test:imagekit": "node test-imagekit.js",
     "test:licenses": "node test-new-license-system.js",
+    "test:ip": "node test-ip-restriction.js",
     "create:admin": "node create-admin-hash.js",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
