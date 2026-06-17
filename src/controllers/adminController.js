@@ -125,7 +125,7 @@ const upgradeToPremium = async (req, res) => {
       return res.status(404).json({ error: 'User introuvable' });
     }
 
-    // PREMIUM = 1 mois (5000 FCFA/mois)
+    // PREMIUM = 1 mois (999 FCFA/mois selon CDC)
     const newExpirationDate = new Date();
     newExpirationDate.setMonth(newExpirationDate.getMonth() + 1);
 
@@ -192,7 +192,7 @@ const reactivateLicense = async (req, res) => {
       newExpirationDate = null;
       maxSimultaneousLogins = 1;
     } else if (licenseType === 'PREMIUM') {
-      // PREMIUM = 1 mois (5000 FCFA/mois)
+      // PREMIUM = 1 mois (999 FCFA/mois selon CDC)
       newExpirationDate = new Date();
       newExpirationDate.setMonth(newExpirationDate.getMonth() + 1);
       maxSimultaneousLogins = 999; // Illimité

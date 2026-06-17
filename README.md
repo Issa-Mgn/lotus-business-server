@@ -51,6 +51,7 @@ server/
 │   │   ├── prisma.js                  # Instance Prisma
 │   │   ├── generateLicenseKey.js      # Générateur LOT-XXXX-xxxx-XXXX
 │   │   ├── checkExpiredLicenses.js    # Vérification automatique
+│   │   ├── getClientIp.js             # Extraction IP réelle (proxy, CDN)
 │   │   └── mailer.js                  # (Legacy - remplacé par Brevo)
 │   ├── services/
 │   │   └── mailService.js             # Service email Brevo
@@ -66,7 +67,7 @@ server/
 │   │   ├── isAdmin.js                 # Vérification rôle admin
 │   │   └── checkLicense.js            # Vérification validité licence
 │   ├── controllers/
-│   │   ├── authController.js          # Inscription/Connexion users
+│   │   ├── authController.js          # Inscription/Connexion + restriction IP
 │   │   ├── adminController.js         # Gestion admin
 │   │   └── infoController.js          # Gestion infos + ImageKit
 │   ├── routes/
@@ -80,6 +81,7 @@ server/
 │   └── seed.js                        # Données de test
 ├── test-email.js                      # Script test email
 ├── test-imagekit.js                   # Script test ImageKit
+├── test-ip-restriction.js             # Script test restriction IP
 └── .env                               # Variables d'environnement
 ```
 
@@ -214,10 +216,12 @@ Content-Type: application/json
     "lastName": "Dupont",
     "licenseKey": "LOT-1234-abcd-5678",
     "licenseType": "FREE",
-    "expirationDate": "2026-07-09T..."
+    "expirationDate": null
   }
 }
 ```
+
+**Note :** Les comptes FREE n'expirent jamais (`expirationDate: null`)
 
 #### 2. Connexion
 
@@ -227,6 +231,24 @@ Content-Type: application/json
 
 {
   "licenseKey": "LOT-1234-abcd-5678"
+}
+```
+
+**Note :** Pour les comptes FREE, la connexion est limitée à 1 appareil (vérification par IP). Si déjà connecté sur un autre appareil, le serveur retourne une erreur 403.
+
+**Réponse succès :**
+```json
+{
+  "message": "Connexion réussie",
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "user": { ... }
+}
+```
+
+**Erreur FREE (déjà connecté sur autre IP) :**
+```json
+{
+  "error": "Compte FREE déjà connecté sur un autre appareil. Déconnectez-vous d'abord ou passez à PREMIUM pour connexions illimitées."
 }
 ```
 
@@ -294,10 +316,10 @@ POST   /admin/change-password          # Changer le mot de passe
 
 ### Types de licences
 
-| Type | Durée | Création |
-|------|-------|----------|
-| **FREE** | 1 mois | Automatique à l'inscription |
-| **PREMIUM** | 1 an | Upgrade admin uniquement |
+| Type | Durée | Appareils | Restriction | Caractéristiques |
+|------|-------|-----------|-------------|------------------|
+| **FREE** | ♾️ Illimité | 1 seul | ✅ Restriction IP | Fonctionnalités limitées, avec publicités |
+| **PREMIUM** | 30 jours | ∞ Illimité | ❌ Aucune | Toutes les fonctionnalités, sans pub, cloud illimité |
 
 ### Statuts
 
@@ -315,9 +337,32 @@ POST   /admin/change-password          # Changer le mot de passe
 
 Exemple : `LOT-8248-izri-8239`
 
+### 🔒 Restriction d'appareils (FREE)
+
+Les comptes **FREE** sont limités à **1 seul appareil** à la fois via une vérification d'adresse IP :
+
+- ✅ Un utilisateur FREE peut se connecter depuis un appareil (IP1)
+- ❌ Si déjà connecté sur IP1, la connexion depuis un autre appareil (IP2) est **REFUSÉE**
+- ✅ Il peut se **déconnecter** puis se reconnecter depuis un autre appareil
+- 💎 Les comptes **PREMIUM** n'ont **aucune restriction** et peuvent se connecter depuis plusieurs appareils simultanément
+
+**Comment ça marche ?**
+
+1. Lors du login, le backend récupère l'IP réelle du client via les headers (`x-forwarded-for`, `x-real-ip`, `cf-connecting-ip`)
+2. Pour les comptes FREE : vérifie si `isOnline = true` et si `lastLoginIp ≠ IP actuelle`
+3. Si les IPs sont différentes → **403 Forbidden** avec message explicite
+4. Pour les comptes PREMIUM : **aucune vérification IP**
+
+**Message d'erreur :**
+```json
+{
+  "error": "Compte FREE déjà connecté sur un autre appareil. Déconnectez-vous d'abord ou passez à PREMIUM pour connexions illimitées."
+}
+```
+
 ### Vérification automatique
 
-Le serveur vérifie automatiquement les licences expirées **toutes les heures** et au démarrage.
+Le serveur vérifie automatiquement les licences expirées **toutes les heures** et au démarrage. Seules les licences **PREMIUM** sont vérifiées (FREE n'expire jamais).
 
 ---
 
@@ -373,6 +418,7 @@ Ce script :
 ```bash
 npm run test:email      # Test envoi email Brevo
 npm run test:imagekit   # Test upload ImageKit
+npm run test:ip         # Test restriction IP FREE
 npm run test:db         # Test connexion Supabase
 npm run test:keys       # Test générateur de clés
 ```
@@ -393,6 +439,17 @@ npm run test:imagekit
 
 Upload et supprime une image de test.
 
+### Test restriction IP
+
+```bash
+npm run test:ip
+```
+
+Teste la restriction d'appareil pour les comptes FREE :
+- ✅ Connexion depuis appareil 1 (doit réussir)
+- ❌ Connexion depuis appareil 2 avec IP différente (doit échouer)
+- ✅ Reconnexion depuis appareil 1 (doit réussir)
+
 ---
 
 ## 📝 Scripts NPM
@@ -405,6 +462,7 @@ Upload et supprime une image de test.
 | `npm run prisma:studio` | Ouvrir Prisma Studio |
 | `npm run test:email` | Tester l'envoi d'emails |
 | `npm run test:imagekit` | Tester ImageKit |
+| `npm run test:ip` | Tester la restriction IP FREE |
 
 ---
 
@@ -472,6 +530,24 @@ node src/app.js
 - `IMAGEKIT_PRIVATE_KEY`
 - `IMAGEKIT_PUBLIC_KEY`
 - `IMAGEKIT_URL_ENDPOINT`
+
+### Restriction IP ne fonctionne pas
+
+**Symptôme :** Les utilisateurs FREE peuvent se connecter depuis plusieurs appareils
+
+**Solutions :**
+1. Vérifier que la colonne `lastLoginIp` existe dans la table `users` (Supabase)
+   ```sql
+   SELECT column_name FROM information_schema.columns 
+   WHERE table_name = 'users' AND column_name = 'lastLoginIp';
+   ```
+2. Exécuter la migration SQL si la colonne n'existe pas :
+   ```sql
+   ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "lastLoginIp" TEXT;
+   ```
+3. Régénérer le client Prisma : `npm run prisma:generate`
+4. Vérifier les logs : chercher "🔐 Tentative connexion" dans les logs Render
+5. Tester localement : `npm run test:ip`
 
 ### Déploiement Render échoue
 

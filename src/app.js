@@ -1,4 +1,4 @@
-// c:\Mes Travaux\Lotus Business\server\src\app.js
+
 
 require('dotenv').config();
 const express = require('express');
@@ -9,6 +9,7 @@ const authRoutes = require('./routes/auth');
 const adminRoutes = require('./routes/admin');
 const activityRoutes = require('./routes/activity');
 const notificationRoutes = require('./routes/notifications');
+const documentRoutes = require('./routes/documents');
 const { checkExpiredLicenses } = require('./lib/checkExpiredLicenses');
 
 // Initialisation de l'app
@@ -43,6 +44,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/activity', activityRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/documents', documentRoutes);
 
 // Middleware de gestion des routes non trouvées
 app.use((req, res) => {
