@@ -3,6 +3,7 @@
 const express = require('express');
 const {
   getAllNotifications,
+  createNotificationHTTP,
   markAsRead,
   markAllAsRead,
   getUnreadCount,
@@ -18,6 +19,7 @@ router.use(auth);
 router.use(isAdmin);
 
 router.get('/', getAllNotifications);
+router.post('/', createNotificationHTTP);
 router.get('/unread-count', getUnreadCount);
 router.patch('/:notificationId/read', markAsRead);
 router.patch('/mark-all-read', markAllAsRead);

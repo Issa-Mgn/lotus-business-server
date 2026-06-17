@@ -3,7 +3,7 @@
 const prisma = require('../lib/prisma');
 
 /**
- * Créer une notification
+ * Créer une notification (fonction helper)
  */
 const createNotification = async (type, title, message, userId = null) => {
   try {
@@ -18,6 +18,48 @@ const createNotification = async (type, title, message, userId = null) => {
     return notification;
   } catch (error) {
     console.error('Erreur création notification:', error);
+  }
+};
+
+/**
+ * Créer une notification via API (route POST)
+ */
+const createNotificationHTTP = async (req, res) => {
+  try {
+    const { type, title, message, userId } = req.body;
+
+    if (!type || !title || !message) {
+      return res.status(400).json({ 
+        error: 'Type, titre et message requis' 
+      });
+    }
+
+    const notification = await prisma.notification.create({
+      data: {
+        type,
+        title,
+        message,
+        userId: userId || null,
+      },
+      include: {
+        user: userId ? {
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+          },
+        } : false,
+      },
+    });
+
+    res.status(201).json({
+      message: 'Notification créée avec succès',
+      notification,
+    });
+  } catch (error) {
+    console.error('Erreur création notification HTTP:', error);
+    res.status(500).json({ error: 'Erreur création notification' });
   }
 };
 
@@ -139,6 +181,7 @@ const deleteNotification = async (req, res) => {
 
 module.exports = {
   createNotification,
+  createNotificationHTTP,
   getAllNotifications,
   markAsRead,
   markAllAsRead,
