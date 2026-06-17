@@ -18,8 +18,9 @@ const PORT = process.env.PORT || 5000;
 
 // Middlewares globaux
 app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// Augmenter la limite de taille pour accepter les images base64 (10MB)
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Vérification des licences expirées toutes les heures
 setInterval(async () => {

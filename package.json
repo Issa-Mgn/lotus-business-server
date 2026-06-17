@@ -15,6 +15,8 @@
     "test:licenses": "node test-new-license-system.js",
     "test:ip": "node test-ip-restriction.js",
     "test:ai": "node test-ai-services.js",
+    "test:infos": "node test-infos-notifications.js",
+    "test:image-upload": "node test-image-upload.js",
     "create:admin": "node create-admin-hash.js",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",

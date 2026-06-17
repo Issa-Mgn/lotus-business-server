@@ -25,6 +25,14 @@ const createInfo = async (req, res) => {
   try {
     const { title, content, imageBase64, published } = req.body;
 
+    console.log('📝 Création info - Données reçues:', {
+      hasTitle: !!title,
+      hasContent: !!content,
+      hasImage: !!imageBase64,
+      imageSize: imageBase64 ? imageBase64.length : 0,
+      published,
+    });
+
     if (!title || !content) {
       return res.status(400).json({ error: 'Titre et contenu requis' });
     }
@@ -34,14 +42,20 @@ const createInfo = async (req, res) => {
     // Upload de l'image si fournie
     if (imageBase64) {
       try {
+        console.log('🖼️  Upload image vers ImageKit...');
         const fileName = `info-${Date.now()}.jpg`;
         imageData = await uploadImage(imageBase64, fileName, 'infos');
+        console.log('✅ Image uploadée:', imageData);
       } catch (uploadError) {
-        console.error('Erreur upload image:', uploadError);
-        return res.status(400).json({ error: uploadError.message });
+        console.error('❌ Erreur upload image:', uploadError);
+        console.error('Stack:', uploadError.stack);
+        return res.status(400).json({ 
+          error: uploadError.message || 'Erreur lors de l\'upload de l\'image' 
+        });
       }
     }
 
+    console.log('💾 Création info dans la base de données...');
     const info = await prisma.info.create({
       data: {
         title,
@@ -55,13 +69,18 @@ const createInfo = async (req, res) => {
       },
     });
 
+    console.log('✅ Info créée avec succès:', info.id);
     res.status(201).json({ 
       message: 'Info publiée avec succès',
       info 
     });
   } catch (error) {
-    console.error('Erreur création info:', error);
-    res.status(500).json({ error: 'Erreur serveur' });
+    console.error('❌ Erreur création info:', error);
+    console.error('Stack:', error.stack);
+    res.status(500).json({ 
+      error: 'Erreur serveur', 
+      details: error.message 
+    });
   }
 };
 
