@@ -9,18 +9,12 @@ const imagekit = require('../config/imagekit');
  */
 const uploadImage = async (base64Image, fileName, folder = 'infos') => {
   try {
-    console.log('📤 ImageKit upload - fileName:', fileName, 'folder:', folder);
-    console.log('📤 ImageKit - Image base64 length:', base64Image?.length || 0);
-    
-    // Vérifier que imagekit est bien configuré
     if (!imagekit) {
       throw new Error('ImageKit client not initialized');
     }
 
     // Supprimer le préfixe data:image si présent
     const base64Data = base64Image.replace(/^data:image\/\w+;base64,/, '');
-    
-    console.log('📤 ImageKit - Base64 data length après nettoyage:', base64Data.length);
 
     const result = await imagekit.upload({
       file: base64Data,
@@ -28,12 +22,6 @@ const uploadImage = async (base64Image, fileName, folder = 'infos') => {
       folder: folder,
       useUniqueFileName: true,
       tags: ['lotus-business', folder],
-    });
-
-    console.log('✅ ImageKit upload réussi:', {
-      url: result.url,
-      fileId: result.fileId,
-      name: result.name,
     });
 
     return {
@@ -44,12 +32,7 @@ const uploadImage = async (base64Image, fileName, folder = 'infos') => {
       thumbnailUrl: result.thumbnailUrl,
     };
   } catch (error) {
-    console.error('❌ Erreur upload ImageKit:', error);
-    console.error('❌ Error details:', {
-      message: error.message,
-      stack: error.stack,
-      response: error.response?.data,
-    });
+    console.error('Erreur upload ImageKit:', error.message);
     throw new Error(`Erreur lors de l'upload de l'image: ${error.message}`);
   }
 };
