@@ -8,11 +8,18 @@ create table if not exists public.infos (
   title text not null,
   content text not null,
   "imageUrl" text,
+  "imageFileId" text,
+  "imageFilePath" text,
+  "thumbnailUrl" text,
   published boolean not null default true,
   "publishedAt" timestamp(3) without time zone not null default current_timestamp,
   "createdAt" timestamp(3) without time zone not null default current_timestamp,
   "updatedAt" timestamp(3) without time zone not null default current_timestamp
 );
+
+alter table public.infos add column if not exists "imageFileId" text;
+alter table public.infos add column if not exists "imageFilePath" text;
+alter table public.infos add column if not exists "thumbnailUrl" text;
 
 create index if not exists infos_published_published_at_idx
   on public.infos (published, "publishedAt" desc);

@@ -1,4 +1,4 @@
-// src/lib/getClientIp.js
+
 
 /**
  * Récupère l'adresse IP réelle du client
