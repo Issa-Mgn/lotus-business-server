@@ -704,6 +704,91 @@ const changePassword = async (req, res) => {
   }
 };
 
+/**
+ * Mettre à jour un utilisateur
+ */
+const updateUser = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const {
+      email,
+      phone,
+      firstName,
+      lastName,
+      licenseType,
+      licenseStatus,
+      expirationDate,
+      maxSimultaneousLogins,
+      lastLoginIp,
+    } = req.body;
+
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+
+    if (!user) {
+      return res.status(404).json({ error: 'Utilisateur introuvable' });
+    }
+
+    const updateData = {};
+
+    if (email) updateData.email = email;
+    if (phone) updateData.phone = phone;
+    if (firstName) updateData.firstName = firstName;
+    if (lastName) updateData.lastName = lastName;
+    if (licenseType) updateData.licenseType = licenseType;
+    if (licenseStatus) updateData.licenseStatus = licenseStatus;
+    if (maxSimultaneousLogins !== undefined) updateData.maxSimultaneousLogins = maxSimultaneousLogins;
+    if (lastLoginIp !== undefined) updateData.lastLoginIp = lastLoginIp || null;
+    
+    // Gestion de expirationDate
+    if (expirationDate !== undefined) {
+      if (expirationDate === '' || expirationDate === null) {
+        updateData.expirationDate = null; // FREE = illimité
+      } else {
+        updateData.expirationDate = new Date(expirationDate);
+      }
+    }
+
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: updateData,
+    });
+
+    res.json({
+      message: 'Utilisateur modifié avec succès',
+      user: updatedUser,
+    });
+  } catch (error) {
+    console.error('Erreur modification utilisateur:', error);
+    res.status(500).json({ error: 'Erreur modification utilisateur' });
+  }
+};
+
+/**
+ * Supprimer un utilisateur
+ */
+const deleteUser = async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+
+    if (!user) {
+      return res.status(404).json({ error: 'Utilisateur introuvable' });
+    }
+
+    await prisma.user.delete({
+      where: { id: userId },
+    });
+
+    res.json({
+      message: 'Utilisateur supprimé avec succès',
+    });
+  } catch (error) {
+    console.error('Erreur suppression utilisateur:', error);
+    res.status(500).json({ error: 'Erreur suppression utilisateur' });
+  }
+};
+
 module.exports = {
   loginAdmin,
   getAllUsers,
@@ -715,6 +800,7 @@ module.exports = {
   createAdmin,
   testEmail,
   sendManualEmail,
+  sendManualEmailDebug,
   sendUserLicenseEmail,
   mailStatus,
   getPublishedInfos,
@@ -724,4 +810,6 @@ module.exports = {
   deleteInfo,
   getProfile,
   changePassword,
+  updateUser,
+  deleteUser,
 };

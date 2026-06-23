@@ -18,6 +18,8 @@ const {
   getAllInfos,
   getProfile,
   changePassword,
+  updateUser,
+  deleteUser,
 } = require('../controllers/adminController');
 
 const {
@@ -75,6 +77,8 @@ router.post('/upgrade-premium', upgradeToPremium);
 router.patch('/suspend/:userId', suspendUser);
 router.post('/reactivate-license', reactivateLicense);
 router.post('/force-logout/:userId', forceLogout);
+router.patch('/users/:userId', updateUser);
+router.delete('/users/:userId', deleteUser);
 
 // Gestion admins
 router.get('/admins', getAllAdmins);

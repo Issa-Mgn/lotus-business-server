@@ -4,6 +4,63 @@ Backend Node.js/Express pour l'application de gestion commerciale Lotus Business
 
 ---
 
+## 🆕 Dernières Mises à Jour
+
+### ✅ CRUD Utilisateurs Complet (Tableau de Bord Admin)
+
+#### 📊 Fonctionnalités Ajoutées
+
+1. **Affichage de toutes les colonnes Supabase**:
+   - Utilisateur (prénom, nom avec avatar)
+   - Contact (email, téléphone)
+   - Clé de licence
+   - Type de licence (FREE/PREMIUM)
+   - Status (ACTIVE/EXPIRED/SUSPENDED)
+   - Date d'expiration
+   - Nombre d'appareils simultanés
+   - **Dernière adresse IP** (nouvelle colonne)
+   - Statut en ligne (●/○)
+   - Dernière connexion
+
+2. **Modal d'Ajout d'Utilisateur**:
+   - Bouton "Ajouter" dans le header
+   - Formulaire complet: prénom, nom, email, téléphone, mot de passe
+   - Choix du type de licence (FREE ou PREMIUM)
+   - Création instantanée avec génération automatique de la clé
+
+3. **Modal de Modification**:
+   - Tous les champs modifiables
+   - **Champ IP modifiable** pour débloquer les utilisateurs FREE bloqués
+   - Mise à jour du type de licence, status, expiration
+   - Modification du nombre d'appareils simultanés
+
+4. **Suppression d'Utilisateurs**:
+   - Bouton supprimer avec confirmation
+   - Suppression définitive de la base de données
+
+5. **Responsive Mobile Optimisé**:
+   - Table avec scroll horizontal sur mobile
+   - Toutes les colonnes visibles
+   - Boutons d'action accessibles
+   - Modaux adaptés aux petits écrans
+
+#### 🔧 Backend
+
+- Route `PATCH /api/admin/users/:userId` - Modifier un utilisateur
+- Route `DELETE /api/admin/users/:userId` - Supprimer un utilisateur
+- Support du champ `lastLoginIp` modifiable
+- Validation complète des données
+
+#### 🎨 Frontend
+
+- Composant `Users.jsx` complètement refait
+- Design moderne et cohérent
+- Messages de succès/erreur
+- Cache API intelligent
+- État de chargement
+
+---
+
 ## 📋 Table des matières
 
 - [Stack Technique](#stack-technique)
@@ -25,7 +82,8 @@ Backend Node.js/Express pour l'application de gestion commerciale Lotus Business
 - **Supabase (PostgreSQL)** - Base de données cloud
 - **JWT** - Authentification
 - **Brevo** - Envoi d'emails (API HTTP transactionnelle)
-- **ImageKit** - Stockage et gestion d'images
+- **ImageKit** - Stockage et gestion d'images (CDN)
+- **Mistral AI** + **Groq** - Génération de documents comptables (IA)
 - **bcrypt** - Hashage des mots de passe (admins)
 - **uuid** - Génération des clés de licence
 
@@ -39,8 +97,9 @@ Backend Node.js/Express pour l'application de gestion commerciale Lotus Business
 2. **admins** : Administrateurs (connexion email/password)
 3. **licenses** : Index rapide email → clé de licence
 4. **infos** : Annonces/informations avec images (ImageKit)
-5. **activities** : Journal d'activité
-6. **notifications** : Notifications système
+5. **notifications** : Notifications système (globales et par utilisateur)
+6. **activities** : Journal d'activité
+7. **app_downloads** : Tracking des téléchargements de l'application
 
 ### Structure du code
 
@@ -54,7 +113,8 @@ server/
 │   │   ├── getClientIp.js             # Extraction IP réelle (proxy, CDN)
 │   │   └── mailer.js                  # (Legacy - remplacé par Brevo)
 │   ├── services/
-│   │   └── mailService.js             # Service email Brevo
+│   │   ├── mailService.js             # Service email Brevo
+│   │   └── aiService.js               # Services IA (Mistral + Groq)
 │   ├── templates/
 │   │   └── welcome.js                 # Template email bienvenue
 │   ├── config/
@@ -68,13 +128,18 @@ server/
 │   │   └── checkLicense.js            # Vérification validité licence
 │   ├── controllers/
 │   │   ├── authController.js          # Inscription/Connexion + restriction IP
-│   │   ├── adminController.js         # Gestion admin
-│   │   └── infoController.js          # Gestion infos + ImageKit
+│   │   ├── adminController.js         # Gestion admin (CRUD users complet)
+│   │   ├── infoController.js          # Gestion infos + ImageKit
+│   │   ├── notificationController.js  # Notifications (admin + users)
+│   │   ├── documentController.js      # Documents comptables (IA)
+│   │   └── downloadController.js      # Tracking téléchargements app
 │   ├── routes/
-│   │   ├── auth.js                    # Routes publiques
-│   │   ├── admin.js                   # Routes admin protégées
+│   │   ├── auth.js                    # Routes publiques + infos/notifications users
+│   │   ├── admin.js                   # Routes admin protégées (CRUD complet)
 │   │   ├── activity.js                # Routes activités
-│   │   └── notifications.js           # Routes notifications
+│   │   ├── notifications.js           # Routes notifications admin
+│   │   ├── documents.js               # Routes génération documents IA
+│   │   └── downloads.js               # Routes tracking téléchargements
 │   └── app.js                         # Point d'entrée
 ├── prisma/
 │   ├── schema.prisma                  # Schéma DB
@@ -117,6 +182,10 @@ BREVO_SENDER_NAME="Lotus Business"
 IMAGEKIT_PRIVATE_KEY="private_xxx"
 IMAGEKIT_PUBLIC_KEY="public_xxx"
 IMAGEKIT_URL_ENDPOINT="https://ik.imagekit.io/xxx"
+
+# IA - Mistral + Groq (gratuit)
+MISTRAL_API_KEY="votre_cle_mistral"
+GROQ_API_KEY="gsk_votre_cle_groq"
 
 # Serveur
 PORT=5000
@@ -263,6 +332,58 @@ Content-Type: application/json
 }
 ```
 
+#### 4. Récupérer les infos (utilisateurs connectés)
+
+```http
+GET /auth/infos
+Authorization: Bearer {user_token}
+```
+
+**Réponse :**
+```json
+{
+  "count": 5,
+  "infos": [
+    {
+      "id": "uuid",
+      "title": "Nouvelle fonctionnalité",
+      "content": "Description...",
+      "imageUrl": "https://ik.imagekit.io/...",
+      "published": true,
+      "publishedAt": "2026-06-19T10:00:00Z"
+    }
+  ]
+}
+```
+
+#### 5. Récupérer les notifications (utilisateurs connectés)
+
+```http
+GET /auth/notifications
+Authorization: Bearer {user_token}
+```
+
+**Réponse :** Retourne les notifications globales + notifications spécifiques à l'utilisateur
+
+```http
+GET /auth/notifications/unread-count
+Authorization: Bearer {user_token}
+```
+
+**Réponse :**
+```json
+{
+  "unreadCount": 3
+}
+```
+
+```http
+PATCH /auth/notifications/:notificationId/read
+Authorization: Bearer {user_token}
+```
+
+Marque une notification comme lue.
+
 ---
 
 ### 🔐 Routes Admin (Protégées)
@@ -272,15 +393,32 @@ Toutes les routes admin nécessitent un header :
 Authorization: Bearer {admin_token}
 ```
 
-#### Gestion des utilisateurs
+#### Gestion des utilisateurs (CRUD complet)
 
 ```http
 GET    /admin/users                    # Liste tous les utilisateurs
+PATCH  /admin/users/:userId            # Modifier un utilisateur (tous champs)
+DELETE /admin/users/:userId            # Supprimer un utilisateur
 POST   /admin/upgrade-premium          # Upgrade user vers PREMIUM
 PATCH  /admin/suspend/:userId          # Suspendre un utilisateur
 POST   /admin/reactivate-license       # Réactiver une licence
 POST   /admin/force-logout/:userId     # Déconnecter un user
 POST   /admin/send-license-email       # Renvoyer email de licence
+```
+
+**Exemple modification utilisateur :**
+```json
+PATCH /admin/users/:userId
+{
+  "email": "nouveau@email.com",
+  "phone": "+221771234567",
+  "firstName": "Jean",
+  "lastName": "Dupont",
+  "licenseType": "PREMIUM",
+  "licenseStatus": "ACTIVE",
+  "expirationDate": "2027-01-01",
+  "maxSimultaneousLogins": 999
+}
 ```
 
 #### Gestion des infos (avec ImageKit)
@@ -309,6 +447,44 @@ GET    /admin/infos/imagekit-auth      # Auth ImageKit pour client
 GET    /admin/profile                  # Profil de l'admin connecté
 POST   /admin/change-password          # Changer le mot de passe
 ```
+
+#### Tracking téléchargements
+
+```http
+GET    /downloads/count                # Compteur téléchargements (total, aujourd'hui, mois)
+GET    /downloads/stats?period=7d      # Statistiques détaillées (7d, 30d, 90d, all)
+POST   /downloads/track                # Enregistrer un téléchargement (route publique)
+```
+
+**Exemple réponse count :**
+```json
+{
+  "total": 1250,
+  "today": 15,
+  "month": 320
+}
+```
+
+#### Documents comptables (IA)
+
+```http
+POST   /documents/compte-resultat      # Générer compte de résultat
+POST   /documents/bilan                # Générer bilan simplifié
+POST   /documents/fiche-stock          # Générer fiche de stock
+```
+
+**Exemple génération compte de résultat :**
+```json
+POST /documents/compte-resultat
+{
+  "period": "2026",
+  "ventes": 15000000,
+  "achats": 8000000,
+  "charges": 2500000
+}
+```
+
+**Réponse :** Document au format JSON conforme SYSCOHADA
 
 ---
 
@@ -416,11 +592,14 @@ Ce script :
 ### Scripts de test disponibles
 
 ```bash
-npm run test:email      # Test envoi email Brevo
-npm run test:imagekit   # Test upload ImageKit
-npm run test:ip         # Test restriction IP FREE
-npm run test:db         # Test connexion Supabase
-npm run test:keys       # Test générateur de clés
+npm run test:email          # Test envoi email Brevo
+npm run test:imagekit       # Test upload ImageKit
+npm run test:ip             # Test restriction IP FREE
+npm run test:db             # Test connexion Supabase
+npm run test:keys           # Test générateur de clés
+npm run test:ai             # Test services IA (Mistral + Groq)
+npm run test:infos          # Test système infos/notifications
+npm run test:image-upload   # Test upload images via API
 ```
 
 ### Test email
@@ -463,6 +642,9 @@ Teste la restriction d'appareil pour les comptes FREE :
 | `npm run test:email` | Tester l'envoi d'emails |
 | `npm run test:imagekit` | Tester ImageKit |
 | `npm run test:ip` | Tester la restriction IP FREE |
+| `npm run test:ai` | Tester les services IA |
+| `npm run test:infos` | Tester infos/notifications |
+| `npm run test:image-upload` | Tester upload images API |
 
 ---
 
@@ -484,6 +666,8 @@ BREVO_SENDER_NAME=Lotus Business
 IMAGEKIT_PRIVATE_KEY=private_...
 IMAGEKIT_PUBLIC_KEY=public_...
 IMAGEKIT_URL_ENDPOINT=https://ik.imagekit.io/...
+MISTRAL_API_KEY=...
+GROQ_API_KEY=gsk_...
 PORT=5000
 NODE_ENV=production
 ```
@@ -503,10 +687,65 @@ node src/app.js
 ### Vérifications post-déploiement
 
 1. ✅ Tester la route de santé : `GET https://votre-api.onrender.com/`
-2. ✅ Tester l'inscription : `POST /api/auth/register`
-3. ✅ Vérifier réception email
-4. ✅ Tester connexion admin : `POST /api/admin/login`
-5. ✅ Tester upload image : `POST /api/admin/infos` avec image base64
+2. ✅ Tester `/health` pour UptimeRobot : `GET https://votre-api.onrender.com/api/health`
+3. ✅ Tester l'inscription : `POST /api/auth/register`
+4. ✅ Vérifier réception email
+5. ✅ Tester connexion admin : `POST /api/admin/login`
+6. ✅ Tester upload image : `POST /api/admin/infos` avec image base64
+7. ✅ Tester génération document IA : `POST /api/documents/compte-resultat`
+
+### UptimeRobot (Monitoring 24/7)
+
+Pour empêcher le serveur Render de s'endormir :
+
+1. Créer un compte sur **https://uptimerobot.com** (gratuit)
+2. Ajouter un monitor :
+   - Type : `HTTP(s)`
+   - URL : `https://lotus-business-server.onrender.com/api/health`
+   - Interval : `5 minutes`
+3. UptimeRobot va ping le serveur toutes les 5 minutes → **serveur toujours actif** 🚀
+
+---
+
+## 🚀 Nouvelles fonctionnalités (Juin 2026)
+
+### 1. Routes utilisateurs pour Infos & Notifications
+
+Les utilisateurs connectés peuvent maintenant accéder aux infos et notifications via :
+- `GET /api/auth/infos` - Récupérer toutes les infos publiées
+- `GET /api/auth/notifications` - Récupérer leurs notifications (globales + spécifiques)
+- `GET /api/auth/notifications/unread-count` - Compteur non lues
+- `PATCH /api/auth/notifications/:id/read` - Marquer comme lu
+
+### 2. Tracking des téléchargements
+
+Nouveau système de suivi des téléchargements de l'application :
+- Table `app_downloads` dans la base
+- Compteurs : total, aujourd'hui, ce mois
+- Statistiques par période et par source
+- Carte "Téléchargements app" dans le dashboard
+
+### 3. CRUD complet des utilisateurs
+
+Le dashboard admin dispose maintenant d'une gestion complète :
+- ✅ Affichage de toutes les colonnes Supabase
+- ✅ Modification complète (email, phone, nom, type licence, status, expiration, appareils)
+- ✅ Suppression d'utilisateurs
+- ✅ Modal d'édition avec tous les champs
+- ✅ Colonnes : Utilisateur, Contact, Clé, Type, Status, Expiration, Appareils, En ligne, Dernière connexion
+
+### 4. Génération documents comptables (IA)
+
+Intégration de **Mistral AI** (primaire) et **Groq** (fallback) :
+- Génération compte de résultat SYSCOHADA
+- Génération bilan simplifié
+- Génération fiche de stock
+- Fallback automatique si Mistral est lent
+- 100% gratuit
+
+### 5. Limite body augmentée
+
+Express accepte maintenant les images base64 jusqu'à **10MB** (fix upload images)
 
 ---
 

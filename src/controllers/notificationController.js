@@ -179,10 +179,81 @@ const deleteNotification = async (req, res) => {
   }
 };
 
+/**
+ * Récupérer les notifications d'un utilisateur spécifique
+ */
+const getUserNotifications = async (req, res) => {
+  try {
+    const userId = req.userId; // Depuis le middleware auth
+    const { unreadOnly } = req.query;
+
+    const where = {
+      OR: [
+        { userId: userId },      // Notifications spécifiques à l'utilisateur
+        { userId: null },        // Notifications globales
+      ],
+    };
+
+    if (unreadOnly === 'true') {
+      where.isRead = false;
+    }
+
+    const notifications = await prisma.notification.findMany({
+      where,
+      orderBy: {
+        createdAt: 'desc',
+      },
+      select: {
+        id: true,
+        type: true,
+        title: true,
+        message: true,
+        isRead: true,
+        createdAt: true,
+        userId: true,
+      },
+    });
+
+    res.json({
+      count: notifications.length,
+      notifications,
+    });
+  } catch (error) {
+    console.error('Erreur get user notifications:', error);
+    res.status(500).json({ error: 'Erreur récupération notifications' });
+  }
+};
+
+/**
+ * Compter les notifications non lues pour un utilisateur
+ */
+const getUserUnreadCount = async (req, res) => {
+  try {
+    const userId = req.userId;
+
+    const count = await prisma.notification.count({
+      where: {
+        isRead: false,
+        OR: [
+          { userId: userId },
+          { userId: null },
+        ],
+      },
+    });
+
+    res.json({ unreadCount: count });
+  } catch (error) {
+    console.error('Erreur count user unread:', error);
+    res.status(500).json({ error: 'Erreur comptage notifications' });
+  }
+};
+
 module.exports = {
   createNotification,
   createNotificationHTTP,
   getAllNotifications,
+  getUserNotifications,
+  getUserUnreadCount,
   markAsRead,
   markAllAsRead,
   getUnreadCount,

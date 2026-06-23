@@ -132,3 +132,13 @@ model Info {
 
   @@map("infos")
 }
+
+model AppDownload {
+  id          String   @id @default(uuid())
+  ipAddress   String?  // IP pour éviter les doublons
+  userAgent   String?  // Navigateur/OS
+  source      String?  // "website", "qr_code", etc.
+  createdAt   DateTime @default(now())
+
+  @@map("app_downloads")
+}

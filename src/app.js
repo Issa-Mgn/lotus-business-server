@@ -10,6 +10,7 @@ const adminRoutes = require('./routes/admin');
 const activityRoutes = require('./routes/activity');
 const notificationRoutes = require('./routes/notifications');
 const documentRoutes = require('./routes/documents');
+const downloadRoutes = require('./routes/downloads');
 const { checkExpiredLicenses } = require('./lib/checkExpiredLicenses');
 
 // Initialisation de l'app
@@ -63,6 +64,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/activity', activityRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/documents', documentRoutes);
+app.use('/api/downloads', downloadRoutes);
 
 // Middleware de gestion des routes non trouvées
 app.use((req, res) => {
