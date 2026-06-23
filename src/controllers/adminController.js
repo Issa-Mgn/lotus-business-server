@@ -278,6 +278,106 @@ const createAdmin = async (req, res) => {
   }
 };
 
+/**
+ * Créer un utilisateur depuis le dashboard admin
+ * Génère automatiquement une clé et envoie l'email de bienvenue
+ */
+const createUserFromAdmin = async (req, res) => {
+  try {
+    const { email, phone, firstName, lastName, licenseType = 'FREE' } = req.body;
+
+    if (!email || !phone || !firstName || !lastName) {
+      return res.status(400).json({ 
+        error: 'Email, téléphone, prénom et nom requis' 
+      });
+    }
+
+    // Vérifier si l'utilisateur existe déjà
+    const existingUser = await prisma.user.findUnique({ where: { email } });
+    if (existingUser) {
+      return res.status(400).json({ 
+        error: 'Un utilisateur avec cet email existe déjà' 
+      });
+    }
+
+    // Générer une clé de licence unique
+    const { v4: uuidv4 } = require('uuid');
+    const generateLicenseKey = () => {
+      const uuid = uuidv4().replace(/-/g, '');
+      const part1 = uuid.substring(0, 4);
+      const part2 = uuid.substring(4, 8);
+      const part3 = uuid.substring(8, 12);
+      return `LOT-${part1}-${part2}-${part3}`;
+    };
+
+    let licenseKey = generateLicenseKey();
+    let keyExists = await prisma.license.findUnique({ where: { licenseKey } });
+    
+    while (keyExists) {
+      licenseKey = generateLicenseKey();
+      keyExists = await prisma.license.findUnique({ where: { licenseKey } });
+    }
+
+    // Déterminer la date d'expiration et le nombre d'appareils
+    const activationDate = new Date();
+    let expirationDate = null;
+    let maxSimultaneousLogins = 1;
+
+    if (licenseType === 'PREMIUM') {
+      expirationDate = new Date();
+      expirationDate.setMonth(expirationDate.getMonth() + 1);
+      maxSimultaneousLogins = 999;
+    }
+
+    // Créer l'utilisateur
+    const newUser = await prisma.user.create({
+      data: {
+        email,
+        phone,
+        firstName,
+        lastName,
+        licenseKey,
+        licenseType,
+        licenseStatus: 'ACTIVE',
+        activationDate,
+        expirationDate,
+        maxSimultaneousLogins,
+      },
+    });
+
+    // Créer l'entrée dans la table licenses
+    await prisma.license.create({
+      data: {
+        email,
+        licenseKey,
+      },
+    });
+
+    // Envoyer l'email de bienvenue avec la clé
+    try {
+      const { welcomeTemplate, welcomeTemplateText } = require('../templates/welcome');
+      await mailService.sendLicenseConfirmation(
+        email,
+        firstName,
+        licenseKey,
+        welcomeTemplate(firstName, licenseKey, expirationDate),
+        welcomeTemplateText(firstName, licenseKey, expirationDate)
+      );
+    } catch (emailError) {
+      console.error('Erreur envoi email:', emailError);
+      // On continue même si l'email échoue
+    }
+
+    res.status(201).json({
+      message: 'Utilisateur créé avec succès. Un email a été envoyé avec la clé de licence.',
+      user: newUser,
+    });
+  } catch (error) {
+    console.error('Erreur création utilisateur:', error);
+    res.status(500).json({ error: 'Erreur création utilisateur' });
+  }
+};
+
 const testEmail = async (req, res) => {
   try {
     const admin = await prisma.admin.findUnique({
@@ -798,6 +898,7 @@ module.exports = {
   reactivateLicense,
   forceLogout,
   createAdmin,
+  createUserFromAdmin,
   testEmail,
   sendManualEmail,
   sendManualEmailDebug,

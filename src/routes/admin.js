@@ -1,7 +1,7 @@
 // c:\Mes Travaux\Lotus Business\server\src\routes\admin.js
 
 const express = require('express');
-const { 
+const {
   loginAdmin,
   getAllUsers, 
   getAllAdmins,
@@ -10,6 +10,7 @@ const {
   reactivateLicense,
   forceLogout,
   createAdmin,
+  createUserFromAdmin,
   testEmail,
   sendManualEmail,
   sendUserLicenseEmail,
@@ -73,6 +74,7 @@ router.post('/change-password', changePassword);
 
 // Gestion users
 router.get('/users', getAllUsers);
+router.post('/users', createUserFromAdmin);
 router.post('/upgrade-premium', upgradeToPremium);
 router.patch('/suspend/:userId', suspendUser);
 router.post('/reactivate-license', reactivateLicense);
