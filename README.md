@@ -4,11 +4,37 @@ Backend Node.js/Express pour l'application de gestion commerciale Lotus Business
 
 ---
 
-## 🆕 Dernières Mises à Jour
+## 🆕 Dernières Mises à Jour (Juin 2026)
 
-### ✅ CRUD Utilisateurs Complet (Tableau de Bord Admin)
+### ✅ Corrections Majeures - Synchronisation et Messages d'Erreur
 
-#### 📊 Fonctionnalités Ajoutées
+#### 🔧 Problèmes Résolés
+
+1. **Suppression en cascade Users ↔ Licenses**:
+   - Ajout relation `userId` dans table `License` avec `onDelete: Cascade`
+   - Quand un utilisateur est supprimé, sa licence est automatiquement supprimée
+   - Plus besoin de supprimer manuellement sur Supabase
+   - Migration SQL disponible dans `prisma/migrations/manual_add_license_cascade.sql`
+
+2. **Format de clé de licence corrigé**:
+   - Ancien format : `LOT-xxxx-xxxx-xxxx`
+   - **Nouveau format : `LOT-1234-ABCD-5678`**
+   - Format : 4 chiffres - 4 lettres MAJUSCULES - 4 chiffres
+   - Exemple : `LOT-8248-KZRI-8239`, `LOT-3457-KSME-9021`
+
+3. **Messages d'erreur précis et détaillés**:
+   - ✅ "Cet email est déjà utilisé" (au lieu de "Erreur lors de la création")
+   - ✅ "Ce numéro de téléphone est déjà utilisé"
+   - ✅ "Erreur de génération de clé. Veuillez réessayer."
+   - ✅ Erreurs Prisma (P2002, P2003, P2025) gérées avec messages clairs
+   - Frontend affiche correctement les messages de succès en vert, erreurs en rouge
+
+4. **Création utilisateur optimisée**:
+   - Création User + License en une seule transaction (nested create)
+   - Plus de problèmes de synchronisation
+   - Génération clé avec vérification d'unicité robuste
+
+#### 📋 CRUD Utilisateurs Complet (Tableau de Bord Admin)
 
 1. **Affichage de toutes les colonnes Supabase**:
    - Utilisateur (prénom, nom avec avatar)
@@ -22,11 +48,49 @@ Backend Node.js/Express pour l'application de gestion commerciale Lotus Business
    - Statut en ligne (●/○)
    - Dernière connexion
 
-2. **Modal d'Ajout d'Utilisateur**:
+---
+
+### 🆕 Nouvelles Fonctionnalités - Système de Réactions et Routes Publiques
+
+#### 📱 Routes Publiques pour l'App Mobile
+
+1. **Infos accessibles sans authentification**:
+   - `GET /api/public/infos` - Récupérer toutes les infos publiées avec stats de réactions
+   - Plus besoin de token pour consulter les infos
+   - Idéal pour l'app mobile (utilisateurs non connectés)
+
+2. **Système de réactions complet**:
+   - 12 types de réactions disponibles : LIKE, LOVE, HAHA, WOW, SAD, ANGRY, THUMBS_UP, THUMBS_DOWN, FIRE, HEART_EYES, CLAP, THINKING
+   - `POST /api/public/infos/:infoId/reactions` - Ajouter une réaction (inscrit ou non)
+   - `GET /api/public/infos/:infoId/reactions` - Voir toutes les réactions
+   - `GET /api/public/infos/:infoId/reactions/stats` - Statistiques par type
+   - Tracking par IP pour utilisateurs non connectés
+   - Chaque info retourne automatiquement ses stats de réactions
+
+3. **Documents légaux publics**:
+   - `GET /terms-of-service.md` - CGU en Markdown (app mobile hors ligne)
+   - `GET /privacy-policy.md` - Confidentialité en Markdown (app mobile hors ligne)
+   - Pas d'authentification requise
+   - Contenu identique aux versions HTML
+
+#### 📚 Documentation Complète
+
+1. **routes.md** - Documentation exhaustive de toutes les routes API :
+   - Routes publiques (infos, réactions, documents légaux)
+   - Routes d'authentification
+   - Routes utilisateur
+   - Routes admin
+   - Routes notifications, documents, téléchargements
+   - Routes activité
+   - Format clé de licence, authentification JWT
+   - Variables d'environnement requises
+
+---2. **Modal d'Ajout d'Utilisateur**:
    - Bouton "Ajouter" dans le header
-   - Formulaire complet: prénom, nom, email, téléphone, mot de passe
+   - Formulaire complet: prénom, nom, email, téléphone
    - Choix du type de licence (FREE ou PREMIUM)
    - Création instantanée avec génération automatique de la clé
+   - **Messages d'erreur précis** en cas de doublon
 
 3. **Modal de Modification**:
    - Tous les champs modifiables
@@ -36,7 +100,8 @@ Backend Node.js/Express pour l'application de gestion commerciale Lotus Business
 
 4. **Suppression d'Utilisateurs**:
    - Bouton supprimer avec confirmation
-   - Suppression définitive de la base de données
+   - **Suppression en cascade** : supprime automatiquement la licence
+   - Plus besoin de supprimer manuellement sur Supabase
 
 5. **Responsive Mobile Optimisé**:
    - Table avec scroll horizontal sur mobile
@@ -44,7 +109,31 @@ Backend Node.js/Express pour l'application de gestion commerciale Lotus Business
    - Boutons d'action accessibles
    - Modaux adaptés aux petits écrans
 
-#### 🔧 Backend
+#### � Étapes Post-Corrections
+
+1. **Exécuter la migration SQL sur Supabase** :
+   ```sql
+   -- Fichier: server/prisma/migrations/manual_add_license_cascade.sql
+   -- Connectez-vous à Supabase SQL Editor et exécutez ce fichier
+   ```
+
+2. **Régénérer le client Prisma** :
+   ```bash
+   npm run prisma:generate
+   ```
+
+3. **Redémarrer le serveur** :
+   ```bash
+   npm run dev
+   ```
+
+4. **Vérifier les corrections** :
+   - Créer un utilisateur → vérifier le format de clé `LOT-1234-ABCD-5678`
+   - Tester doublon email → message précis "Cet email est déjà utilisé"
+   - Tester doublon téléphone → message précis "Ce numéro de téléphone est déjà utilisé"
+   - Supprimer un utilisateur → vérifier que sa licence est aussi supprimée
+
+#### �🔧 Backend
 
 - Route `PATCH /api/admin/users/:userId` - Modifier un utilisateur
 - Route `DELETE /api/admin/users/:userId` - Supprimer un utilisateur
@@ -505,13 +594,13 @@ POST /documents/compte-resultat
 
 ### Format des clés
 
-`LOT-XXXX-xxxx-XXXX`
+**Nouveau format (corrigé) : `LOT-1234-ABCD-5678`**
 
-- Part 1 : 4 chiffres
-- Part 2 : 4 lettres minuscules
-- Part 3 : 4 chiffres
+- Part 1 : **4 chiffres** (0000-9999)
+- Part 2 : **4 lettres MAJUSCULES** (AAAA-ZZZZ)
+- Part 3 : **4 chiffres** (0000-9999)
 
-Exemple : `LOT-8248-izri-8239`
+Exemples : `LOT-8248-IZRI-8239`, `LOT-3457-KSME-9021`, `LOT-1024-QWER-5678`
 
 ### 🔒 Restriction d'appareils (FREE)
 
@@ -813,7 +902,7 @@ node --check src/app.js
 
 Pour toute question ou contribution, contacter le développeur.
 
-**Développé avec ❤️ par L!txx pour Lotus Business**
+**Développé par L!txx pour Lotus Business**
 
 ---
 

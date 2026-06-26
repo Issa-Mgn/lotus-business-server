@@ -36,7 +36,7 @@ const register = async (req, res) => {
 
     if (existingPhone) {
       return res.status(400).json({ 
-        error: 'Ce numéro est déjà utilisé' 
+        error: 'Ce numéro de téléphone est déjà utilisé' 
       });
     }
 
@@ -61,18 +61,12 @@ const register = async (req, res) => {
         activationDate,
         expirationDate,
         maxSimultaneousLogins,
-      },
-    });
-
-    // Création ou mise à jour dans Licenses (upsert pour gérer les réinscriptions)
-    await prisma.license.upsert({
-      where: { email },
-      update: {
-        key: licenseKey,
-      },
-      create: {
-        email,
-        key: licenseKey,
+        license: {
+          create: {
+            email,
+            licenseKey,
+          }
+        }
       },
     });
 
@@ -111,7 +105,25 @@ const register = async (req, res) => {
     });
   } catch (error) {
     console.error('Erreur inscription:', error);
-    res.status(500).json({ error: 'Erreur lors de l\'inscription' });
+    
+    // Messages d'erreur détaillés basés sur le code Prisma
+    if (error.code === 'P2002') {
+      const field = error.meta?.target?.[0];
+      if (field === 'email') {
+        return res.status(400).json({ error: 'Cet email est déjà utilisé' });
+      } else if (field === 'phone') {
+        return res.status(400).json({ error: 'Ce numéro de téléphone est déjà utilisé' });
+      } else if (field === 'licenseKey') {
+        return res.status(500).json({ error: 'Erreur de génération de clé. Veuillez réessayer.' });
+      }
+      return res.status(400).json({ error: 'Ces informations sont déjà utilisées' });
+    }
+    
+    if (error.code === 'P2003') {
+      return res.status(400).json({ error: 'Référence invalide dans les données' });
+    }
+    
+    res.status(500).json({ error: 'Erreur lors de l\'inscription. Veuillez réessayer.' });
   }
 };
 

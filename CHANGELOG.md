@@ -1,170 +1,175 @@
-# 📝 Changelog - Lotus Business
+# Changelog - Lotus Business Backend
 
-Toutes les modifications notables de ce projet seront documentées dans ce fichier.
-
----
-
-## [23 Juin 2026] - CRUD Utilisateurs Complet
-
-### ✅ Ajouté
-
-#### Backend API
-- **Route PATCH `/api/admin/users/:userId`** - Modification complète d'un utilisateur
-  - Tous les champs modifiables: email, phone, firstName, lastName
-  - Gestion du type de licence et du status
-  - Support de la modification de `lastLoginIp` (pour débloquer les utilisateurs)
-  - Modification du nombre d'appareils simultanés
-  - Gestion de la date d'expiration (null pour FREE illimité)
-
-- **Route DELETE `/api/admin/users/:userId`** - Suppression d'un utilisateur
-  - Suppression définitive de la base de données
-  - Vérification de l'existence avant suppression
-
-#### Frontend Dashboard
-- **Page Utilisateurs Complète** (`Users.jsx`)
-  - Affichage de toutes les colonnes Supabase:
-    - Utilisateur (prénom, nom, avatar)
-    - Contact (email, téléphone)
-    - Clé de licence
-    - Type (FREE/PREMIUM)
-    - Status (ACTIVE/EXPIRED/SUSPENDED)
-    - Date d'expiration
-    - Nombre d'appareils
-    - **Dernière adresse IP** ⭐ NOUVEAU
-    - Statut en ligne (●/○)
-    - Dernière connexion
-    - Actions (Modifier, Supprimer)
-
-- **Modal d'Ajout d'Utilisateur** ⭐ NOUVEAU
-  - Bouton "Ajouter" dans le header
-  - Formulaire avec tous les champs requis
-  - Choix du type de licence (FREE/PREMIUM)
-  - Génération automatique de la clé de licence
-  - Validation frontend complète
-
-- **Modal de Modification** ⭐ AMÉLIORÉ
-  - Tous les champs modifiables
-  - Champ IP modifiable pour débloquer les utilisateurs
-  - Mise à jour du type, status, expiration
-  - Modification des appareils simultanés
-  - Messages de succès/erreur
-
-- **Fonctionnalité de Suppression** ⭐ NOUVEAU
-  - Bouton supprimer avec icône poubelle
-  - Confirmation avant suppression
-  - Message de succès après suppression
-
-### 🎨 Design & UX
-
-- **Responsive Mobile Optimisé**
-  - Table avec scroll horizontal sur mobile
-  - Toutes les colonnes accessibles
-  - Modaux adaptés aux petits écrans
-  - Grilles de formulaire responsive (2 colonnes → 1 colonne sur mobile)
-  - Boutons d'action toujours accessibles
-
-- **Styles CSS Améliorés**
-  - Classe `.pill-badge` pour les badges ronds
-  - Classe `.search-box` pour la barre de recherche
-  - Classe `.modal-panel` pour les modaux
-  - Classe `.modal-actions` pour les actions de modal
-  - Support complet du responsive avec media queries
-
-### 🔧 Améliorations Techniques
-
-- **Controller `adminController.js`**
-  - Fonction `updateUser` avec validation complète
-  - Fonction `deleteUser` avec vérification
-  - Support du champ `lastLoginIp` modifiable
-  - Gestion des dates d'expiration null
-
-- **API Client `api.js`**
-  - Méthode `usersAPI.update(userId, userData)`
-  - Méthode `usersAPI.delete(userId)`
-  - Cache invalidation après modifications
-  - Gestion des erreurs améliorée
-
-### 🐛 Corrections
-
-- **Route `/api/downloads`**
-  - Correction du chemin des middlewares (`../middlewares/` au lieu de `../middleware/`)
-  - Utilisation correcte de `auth` et `isAdmin`
-
-- **Serveur Backend**
-  - Gestion des erreurs de port déjà utilisé
-  - Démarrage propre avec messages clairs
-
-### 📚 Documentation
-
-- **README.md** mis à jour avec:
-  - Section "Dernières Mises à Jour"
-  - Description complète des fonctionnalités CRUD
-  - Instructions pour le backend et frontend
-  - Colonnes affichées dans le tableau
+Toutes les modifications importantes du projet.
 
 ---
 
-## Résumé des Fonctionnalités Actuelles
+## [1.2.0] - 2026-06-26
 
-### 🔐 Système de Licences
-- **FREE**: Durée illimitée (expirationDate = null), 1 appareil uniquement
-- **PREMIUM**: 999 FCFA/mois, appareils illimités (999), sans pub
+### 🆕 Nouvelles Fonctionnalités
 
-### 📧 Emails
-- Service Brevo (API HTTP transactionnelle)
-- Templates personnalisés avec logo
-- Email de bienvenue avec clé de licence
+#### Routes Publiques et Système de Réactions
 
-### 🖼️ Gestion d'Images
-- ImageKit pour le stockage (CDN)
-- Supabase pour les métadonnées
-- Upload base64 jusqu'à 10MB
+- **Routes publiques pour les infos** :
+  - `GET /api/public/infos` - Récupérer toutes les infos sans authentification
+  - Inclut automatiquement les statistiques de réactions
+  - Idéal pour l'app mobile (utilisateurs non connectés)
 
-### 🤖 IA pour Documents
-- Mistral AI (primaire) + Groq (fallback)
-- Génération de documents comptables
-- Format JSON conforme SYSCOHADA
+- **Système de réactions complet** :
+  - 12 types de réactions : LIKE, LOVE, HAHA, WOW, SAD, ANGRY, THUMBS_UP, THUMBS_DOWN, FIRE, HEART_EYES, CLAP, THINKING
+  - `POST /api/public/infos/:infoId/reactions` - Ajouter une réaction (public)
+  - `GET /api/public/infos/:infoId/reactions` - Voir toutes les réactions
+  - `GET /api/public/infos/:infoId/reactions/stats` - Statistiques par type
+  - Tracking par IP pour utilisateurs non connectés
+  - Tracking optionnel par userId pour utilisateurs connectés
 
-### 📱 Système Infos & Notifications
-- Annonces globales avec images
-- Notifications par utilisateur
-- Marquer comme lu, compteur non lus
+- **Documents légaux en Markdown** :
+  - `GET /terms-of-service.md` - CGU publiques en Markdown
+  - `GET /privacy-policy.md` - Confidentialité publique en Markdown
+  - Pas d'authentification requise
+  - Contenu identique aux versions HTML
+  - Optimisé pour l'app mobile (support hors ligne)
 
-### 📊 Tracking Téléchargements
-- Table `app_downloads`
-- Tracking par IP, user-agent, source
-- Statistiques: total, aujourd'hui, ce mois
+### 📝 Documentation
 
-### 🔒 Sécurité IP
-- Restriction IP pour comptes FREE
-- 1 seul appareil (même IP) pour FREE
-- PREMIUM bypass complet
+- **routes.md** - Documentation exhaustive de toutes les routes API
+- **POSTMAN_TESTS.md** - Guide complet pour tester avec Postman
+- **README.md** mis à jour avec les nouvelles fonctionnalités
 
-### 🎯 Routes Health Check
-- `/health` et `/api/health`
-- Pour UptimeRobot (empêche Render de s'endormir)
+### 🗄️ Base de Données
+
+- **Nouveau modèle Reaction** :
+  ```prisma
+  model Reaction {
+    id           String       @id @default(uuid())
+    infoId       String
+    reactionType ReactionType
+    userId       String?
+    ipAddress    String?
+    userAgent    String?
+    createdAt    DateTime     @default(now())
+  }
+  ```
+
+- **Enum ReactionType** :
+  ```prisma
+  enum ReactionType {
+    LIKE, LOVE, HAHA, WOW, SAD, ANGRY,
+    THUMBS_UP, THUMBS_DOWN, FIRE, HEART_EYES, CLAP, THINKING
+  }
+  ```
+
+- **Relation Info ↔ Reactions** avec cascade delete
+
+### 📁 Fichiers Créés
+
+- `src/routes/public.js` - Routes publiques (infos, réactions)
+- `src/controllers/reactionController.js` - Gestion des réactions
+- `prisma/migrations/manual_add_reactions.sql` - Migration SQL pour Supabase
+- `routes.md` - Documentation API complète
+- `POSTMAN_TESTS.md` - Guide de tests Postman
+- `CHANGELOG.md` - Ce fichier
+
+### 🔧 Modifications
+
+- `src/app.js` - Ajout route `/api/public`
+- `src/routes/auth.js` - Suppression route `/infos` (déplacée vers public)
+- `src/controllers/infoController.js` - Ajout stats de réactions dans `getAllInfos`
+- `prisma/schema.prisma` - Ajout modèles Reaction et enum ReactionType
+- `README.md` - Mise à jour avec nouvelles features
 
 ---
 
-## 🚀 Prochaines Étapes Recommandées
+## [1.1.0] - 2026-06-14
 
-1. **Déploiement**
-   - Commit et push du code
-   - Redéploiement sur Render
-   - Test des nouvelles routes en production
+### ✅ Corrections Majeures
 
-2. **Tests**
-   - Tester l'ajout d'utilisateurs
-   - Tester la modification (surtout le champ IP)
-   - Tester la suppression
-   - Vérifier le responsive sur mobile
+#### Synchronisation Supabase
 
-3. **Optimisations**
-   - Pagination pour grandes listes d'utilisateurs
-   - Filtres avancés (par type, status, etc.)
-   - Export CSV des utilisateurs
+- **Cascade Delete Users ↔ Licenses** :
+  - Ajout `userId` dans table License avec `onDelete: Cascade`
+  - Suppression automatique de la licence lors de la suppression d'un utilisateur
+  - Migration SQL : `prisma/migrations/manual_add_license_cascade.sql`
+
+#### Format de Clé de Licence
+
+- **Correction du format** :
+  - Ancien : `LOT-xxxx-xxxx-xxxx` (alphanumérique aléatoire)
+  - Nouveau : `LOT-1234-ABCD-5678` (4 chiffres - 4 LETTRES - 4 chiffres)
+  - Fichier : `src/lib/generateLicenseKey.js`
+
+#### Messages d'Erreur
+
+- **Messages précis et détaillés** :
+  - "Cet email est déjà utilisé" (P2002 sur email)
+  - "Ce numéro de téléphone est déjà utilisé" (P2002 sur phone)
+  - "Erreur de génération de clé" (P2002 sur licenseKey)
+  - Gestion erreurs Prisma : P2002, P2003, P2025
+  - Frontend : affichage correct (vert = succès, rouge = erreur)
+
+#### Création Utilisateur
+
+- **Optimisation** :
+  - Création User + License en une seule transaction (nested create)
+  - Génération clé avec vérification d'unicité robuste
+  - Plus de problèmes de synchronisation
+
+### 📝 Fichiers Modifiés
+
+- `prisma/schema.prisma` - Ajout userId dans License
+- `src/lib/generateLicenseKey.js` - Nouveau format de clé
+- `src/controllers/authController.js` - Messages d'erreur détaillés
+- `src/controllers/adminController.js` - Messages d'erreur détaillés
+- `dashboard/src/pages/Users.jsx` - Affichage messages (vert/rouge)
 
 ---
 
-**Date de mise à jour**: 23 Juin 2026  
-**Version**: 2.0.0
+## [1.0.0] - 2026-06-10
+
+### 🎉 Version Initiale
+
+#### Fonctionnalités
+
+- Authentification JWT (users et admins)
+- Gestion de licences (FREE/PREMIUM)
+- Système de notifications
+- Génération documents comptables (IA)
+- Emails automatiques (Brevo)
+- Push notifications (Expo)
+- Upload images (ImageKit)
+- Documents légaux (CGU/Privacy)
+- Tracking téléchargements
+- Logs d'activité
+- Vérification automatique licences expirées
+
+#### Technologies
+
+- Node.js + Express
+- PostgreSQL + Prisma
+- JWT
+- Brevo (emails)
+- ImageKit (images)
+- OpenAI + Gemini + Perplexity (IA)
+
+---
+
+## 📊 Statistiques
+
+### Version 1.2.0
+- **Lignes de code ajoutées** : ~800
+- **Nouveaux fichiers** : 7
+- **Fichiers modifiés** : 5
+- **Nouvelles routes** : 6 (publiques)
+- **Nouvelles fonctionnalités** : 3 (réactions, infos publiques, docs MD)
+
+### Total Projet
+- **Routes API** : 60+
+- **Modèles Prisma** : 11
+- **Contrôleurs** : 10
+- **Middlewares** : 2
+- **Services** : 4
+
+---
+
+**Mainteneur** : Lotus Business Team  
+**Dernière mise à jour** : 26 juin 2026

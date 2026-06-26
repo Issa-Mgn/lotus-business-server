@@ -6,31 +6,37 @@ const isAdmin = require('../middlewares/isAdmin');
 const { sendLegalUpdateEmails } = require('../services/brevoLegal');
 const { sendPushNotifications } = require('../services/pushLegal');
 
-// POST /admin/legal - créer un document légal et notifier les users
-router.post('/admin/legal', auth, isAdmin, async (req, res) => {
-  try {
-    const { type, version, content } = req.body;
-    if (!type || !version || !content) {
-      return res.status(400).json({ error: 'type, version et content requis' });
-    }
+// ===================================
+// ROUTES PUBLIQUES (pas d'auth)
+// ===================================
 
-    const doc = await prisma.legalDocument.create({
-      data: { type, version, content }
-    });
-
-    // Récupérer tous les users pour notifications
-    const users = await prisma.user.findMany({ select: { id: true, email: true, firstName: true, lastName: true, expoPushToken: true } });
-
-    // Envoyer emails et push (ne pas attendre pour tout terminer mais catch les erreurs)
-    sendLegalUpdateEmails(users, doc).catch(err => console.error('Mail send error:', err));
-    sendPushNotifications(users, doc).catch(err => console.error('Push send error:', err));
-
-    return res.json({ success: true, documentId: doc.id });
-  } catch (error) {
-    console.error('POST /admin/legal error:', error);
-    return res.status(500).json({ error: 'Erreur interne' });
-  }
+// Servir fichiers HTML pour le site web
+router.get('/terms-of-service', (req, res) => {
+  return res.sendFile('terms-of-service.html', { root: process.cwd() });
 });
+
+router.get('/privacy-policy', (req, res) => {
+  return res.sendFile('privacy-policy.html', { root: process.cwd() });
+});
+
+// Servir fichiers Markdown pour l'app mobile (hors ligne)
+router.get('/terms-of-service.md', (req, res) => {
+  return res.sendFile('terms-of-service.md', { 
+    root: process.cwd(), 
+    headers: { 'Content-Type': 'text/markdown; charset=utf-8' } 
+  });
+});
+
+router.get('/privacy-policy.md', (req, res) => {
+  return res.sendFile('privacy-policy.md', { 
+    root: process.cwd(), 
+    headers: { 'Content-Type': 'text/markdown; charset=utf-8' } 
+  });
+});
+
+// ===================================
+// ROUTES PROTÉGÉES (auth required)
+// ===================================
 
 // GET /legal/latest - retourne les derniers CGU et PRIVACY_POLICY
 router.get('/legal/latest', auth, async (req, res) => {
@@ -81,13 +87,34 @@ router.post('/legal/accept', auth, async (req, res) => {
   }
 });
 
-// Public: servir fichiers statiques (si app ne le fait pas globalement)
-router.get('/terms-of-service', (req, res) => {
-  return res.sendFile('terms-of-service.html', { root: process.cwd() });
-});
+// ===================================
+// ROUTES ADMIN (auth + isAdmin)
+// ===================================
 
-router.get('/privacy-policy', (req, res) => {
-  return res.sendFile('privacy-policy.html', { root: process.cwd() });
+// POST /admin/legal - créer un document légal et notifier les users
+router.post('/admin/legal', auth, isAdmin, async (req, res) => {
+  try {
+    const { type, version, content } = req.body;
+    if (!type || !version || !content) {
+      return res.status(400).json({ error: 'type, version et content requis' });
+    }
+
+    const doc = await prisma.legalDocument.create({
+      data: { type, version, content }
+    });
+
+    // Récupérer tous les users pour notifications
+    const users = await prisma.user.findMany({ select: { id: true, email: true, firstName: true, lastName: true, expoPushToken: true } });
+
+    // Envoyer emails et push (ne pas attendre pour tout terminer mais catch les erreurs)
+    sendLegalUpdateEmails(users, doc).catch(err => console.error('Mail send error:', err));
+    sendPushNotifications(users, doc).catch(err => console.error('Push send error:', err));
+
+    return res.json({ success: true, documentId: doc.id });
+  } catch (error) {
+    console.error('POST /admin/legal error:', error);
+    return res.status(500).json({ error: 'Erreur interne' });
+  }
 });
 
 module.exports = router;

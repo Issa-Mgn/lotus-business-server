@@ -9,9 +9,36 @@ const getAllInfos = async (req, res) => {
     const infos = await prisma.info.findMany({
       where: { published: true },
       orderBy: { publishedAt: 'desc' },
+      include: {
+        reactions: {
+          select: {
+            id: true,
+            reactionType: true,
+            createdAt: true,
+          },
+        },
+      },
     });
 
-    res.json({ infos });
+    // Ajouter les statistiques de réactions pour chaque info
+    const infosWithStats = infos.map(info => {
+      const reactionStats = {};
+      let totalReactions = 0;
+
+      info.reactions.forEach(reaction => {
+        reactionStats[reaction.reactionType] = (reactionStats[reaction.reactionType] || 0) + 1;
+        totalReactions++;
+      });
+
+      return {
+        ...info,
+        reactionStats,
+        totalReactions,
+        reactions: undefined, // Ne pas envoyer tous les détails des réactions
+      };
+    });
+
+    res.json({ infos: infosWithStats });
   } catch (error) {
     console.error('Erreur récupération infos:', error);
     res.status(500).json({ error: 'Erreur serveur' });

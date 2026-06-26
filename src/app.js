@@ -12,6 +12,7 @@ const notificationRoutes = require('./routes/notifications');
 const documentRoutes = require('./routes/documents');
 const downloadRoutes = require('./routes/downloads');
 const legalRoutes = require('./routes/legal');
+const publicRoutes = require('./routes/public');
 const { checkExpiredLicenses } = require('./lib/checkExpiredLicenses');
 
 // Initialisation de l'app
@@ -60,6 +61,7 @@ app.get('/api/health', (req, res) => {
 });
 
 // Routes
+app.use('/api/public', publicRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/activity', activityRoutes);

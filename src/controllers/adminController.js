@@ -300,22 +300,23 @@ const createUserFromAdmin = async (req, res) => {
       });
     }
 
-    // Générer une clé de licence unique
-    const { v4: uuidv4 } = require('uuid');
-    const generateLicenseKey = () => {
-      const uuid = uuidv4().replace(/-/g, '');
-      const part1 = uuid.substring(0, 4);
-      const part2 = uuid.substring(4, 8);
-      const part3 = uuid.substring(8, 12);
-      return `LOT-${part1}-${part2}-${part3}`;
-    };
+    // Vérifier si le téléphone est déjà utilisé
+    const existingPhone = await prisma.user.findUnique({ where: { phone } });
+    if (existingPhone) {
+      return res.status(400).json({ 
+        error: 'Ce numéro de téléphone est déjà utilisé' 
+      });
+    }
 
+    // Générer une clé de licence unique
+    const generateLicenseKey = require('../lib/generateLicenseKey');
     let licenseKey = generateLicenseKey();
-    let keyExists = await prisma.license.findUnique({ where: { licenseKey } });
     
+    // Vérifier l'unicité (extrêmement rare mais important)
+    let keyExists = await prisma.user.findUnique({ where: { licenseKey } });
     while (keyExists) {
       licenseKey = generateLicenseKey();
-      keyExists = await prisma.license.findUnique({ where: { licenseKey } });
+      keyExists = await prisma.user.findUnique({ where: { licenseKey } });
     }
 
     // Déterminer la date d'expiration et le nombre d'appareils
@@ -329,7 +330,7 @@ const createUserFromAdmin = async (req, res) => {
       maxSimultaneousLogins = 999;
     }
 
-    // Créer l'utilisateur
+    // Créer l'utilisateur avec la licence en une transaction
     const newUser = await prisma.user.create({
       data: {
         email,
@@ -342,14 +343,12 @@ const createUserFromAdmin = async (req, res) => {
         activationDate,
         expirationDate,
         maxSimultaneousLogins,
-      },
-    });
-
-    // Créer l'entrée dans la table licenses
-    await prisma.license.create({
-      data: {
-        email,
-        licenseKey,
+        license: {
+          create: {
+            email,
+            licenseKey,
+          }
+        }
       },
     });
 
@@ -360,8 +359,8 @@ const createUserFromAdmin = async (req, res) => {
         email,
         firstName,
         licenseKey,
-        welcomeTemplate(firstName, licenseKey, expirationDate),
-        welcomeTemplateText(firstName, licenseKey, expirationDate)
+        welcomeTemplate(firstName, licenseKey, expirationDate, licenseType),
+        welcomeTemplateText(firstName, licenseKey, expirationDate, licenseType)
       );
     } catch (emailError) {
       console.error('Erreur envoi email:', emailError);
@@ -374,7 +373,25 @@ const createUserFromAdmin = async (req, res) => {
     });
   } catch (error) {
     console.error('Erreur création utilisateur:', error);
-    res.status(500).json({ error: 'Erreur création utilisateur' });
+    
+    // Messages d'erreur détaillés basés sur le code Prisma
+    if (error.code === 'P2002') {
+      const field = error.meta?.target?.[0];
+      if (field === 'email') {
+        return res.status(400).json({ error: 'Cet email est déjà utilisé' });
+      } else if (field === 'phone') {
+        return res.status(400).json({ error: 'Ce numéro de téléphone est déjà utilisé' });
+      } else if (field === 'licenseKey') {
+        return res.status(500).json({ error: 'Erreur de génération de clé. Veuillez réessayer.' });
+      }
+      return res.status(400).json({ error: 'Ces informations sont déjà utilisées' });
+    }
+    
+    if (error.code === 'P2003') {
+      return res.status(400).json({ error: 'Référence invalide dans les données' });
+    }
+    
+    res.status(500).json({ error: 'Erreur lors de la création de l\'utilisateur. Veuillez réessayer.' });
   }
 };
 
@@ -864,28 +881,48 @@ const updateUser = async (req, res) => {
 };
 
 /**
- * Supprimer un utilisateur
+ * Supprimer un utilisateur (supprime automatiquement sa licence grâce à la cascade)
  */
 const deleteUser = async (req, res) => {
   try {
     const { userId } = req.params;
 
-    const user = await prisma.user.findUnique({ where: { id: userId } });
+    const user = await prisma.user.findUnique({ 
+      where: { id: userId },
+      include: { license: true }
+    });
 
     if (!user) {
       return res.status(404).json({ error: 'Utilisateur introuvable' });
     }
 
+    // La suppression de l'utilisateur supprimera automatiquement sa licence (onDelete: Cascade)
     await prisma.user.delete({
       where: { id: userId },
     });
 
+    console.log(`✅ Utilisateur ${user.email} et sa licence supprimés avec succès`);
+
     res.json({
-      message: 'Utilisateur supprimé avec succès',
+      message: 'Utilisateur et sa licence supprimés avec succès',
+      deletedUser: {
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+      }
     });
   } catch (error) {
     console.error('Erreur suppression utilisateur:', error);
-    res.status(500).json({ error: 'Erreur suppression utilisateur' });
+    
+    if (error.code === 'P2025') {
+      return res.status(404).json({ error: 'Utilisateur introuvable' });
+    }
+    
+    if (error.code === 'P2003') {
+      return res.status(400).json({ error: 'Impossible de supprimer: des données liées existent encore' });
+    }
+    
+    res.status(500).json({ error: 'Erreur lors de la suppression de l\'utilisateur' });
   }
 };
 

@@ -39,6 +39,21 @@ enum ActivityType {
   PASSWORD_CHANGED
 }
 
+enum ReactionType {
+  LIKE
+  LOVE
+  HAHA
+  WOW
+  SAD
+  ANGRY
+  THUMBS_UP
+  THUMBS_DOWN
+  FIRE
+  HEART_EYES
+  CLAP
+  THINKING
+}
+
 model User {
   id                    String        @id @default(uuid())
   email                 String        @unique
@@ -58,6 +73,7 @@ model User {
   expoPushToken         String?
   createdAt             DateTime      @default(now())
 
+  license          License?              @relation("UserLicense")
   legalAcceptances UserLegalAcceptance[]
   notifications    Notification[]
   activityLogs     ActivityLog[]         @relation("ActivityTarget")
@@ -82,6 +98,8 @@ model License {
   id         String @id @default(uuid())
   email      String @unique
   licenseKey String @unique
+  userId     String @unique
+  user       User   @relation("UserLicense", fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("licenses")
 }
@@ -115,19 +133,35 @@ model ActivityLog {
 }
 
 model Info {
-  id            String   @id @default(uuid())
+  id            String     @id @default(uuid())
   title         String
   content       String
   imageUrl      String?
   imageFileId   String?
   imageFilePath String?
   thumbnailUrl  String?
-  published     Boolean  @default(true)
-  publishedAt   DateTime @default(now())
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  published     Boolean    @default(true)
+  publishedAt   DateTime   @default(now())
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  reactions     Reaction[]
 
   @@map("infos")
+}
+
+model Reaction {
+  id           String       @id @default(uuid())
+  infoId       String
+  info         Info         @relation(fields: [infoId], references: [id], onDelete: Cascade)
+  reactionType ReactionType
+  userId       String?
+  ipAddress    String?
+  userAgent    String?
+  createdAt    DateTime     @default(now())
+
+  @@index([infoId])
+  @@index([ipAddress])
+  @@map("reactions")
 }
 
 model AppDownload {
