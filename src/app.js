@@ -11,6 +11,7 @@ const activityRoutes = require('./routes/activity');
 const notificationRoutes = require('./routes/notifications');
 const documentRoutes = require('./routes/documents');
 const downloadRoutes = require('./routes/downloads');
+const legalRoutes = require('./routes/legal');
 const { checkExpiredLicenses } = require('./lib/checkExpiredLicenses');
 
 // Initialisation de l'app
@@ -65,6 +66,11 @@ app.use('/api/activity', activityRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/documents', documentRoutes);
 app.use('/api/downloads', downloadRoutes);
+// Routes légales (CGU / Privacy)
+app.use('/', legalRoutes);
+
+// Servir fichiers statiques à la racine (permet l'accès à terms-of-service.html et privacy-policy.html)
+app.use(express.static(process.cwd()));
 
 // Middleware de gestion des routes non trouvées
 app.use((req, res) => {

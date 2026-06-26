@@ -1,95 +1,55 @@
-// c:\Mes Travaux\Lotus Business\server\prisma\seed.js
-
 const { PrismaClient } = require('@prisma/client');
-const bcrypt = require('bcrypt');
-const generateLicenseKey = require('../src/lib/generateLicenseKey');
-
 const prisma = new PrismaClient();
 
 async function main() {
   console.log('🌱 Début du seeding...');
 
-  // Hashage du mot de passe admin
-  const hashedPassword = await bcrypt.hash('admin123', 10);
-
-  // Calcul de la date de fin pour la licence ANNUAL (1 an)
-  const startDate = new Date();
-  const endDate = new Date();
-  endDate.setFullYear(endDate.getFullYear() + 1);
-
-  // Création de l'utilisateur admin avec licence ANNUAL
-  const admin = await prisma.user.upsert({
-    where: { email: 'admin@lotusbusiness.com' },
+  // Seed Admin
+  const admin = await prisma.admin.upsert({
+    where: { email: 'litxx.org@gmail.com' },
     update: {},
     create: {
-      email: 'admin@lotusbusiness.com',
-      firstName: 'Admin',
-      lastName: 'Lotus',
-      password: hashedPassword,
-      role: 'ADMIN',
-      license: {
-        create: {
-          key: generateLicenseKey(),
-          type: 'ANNUAL',
-          status: 'ACTIVE',
-          startDate,
-          endDate,
-        },
-      },
-    },
-    include: {
-      license: true,
+      email: 'litxx.org@gmail.com',
+      phone: '+22900000000',
+      password: '$2b$10$QnwxDej2lhUQwSCfOdIpZOCZZdMmGaubLxqSMTdptV58vK5PYzThK', // admin123
     },
   });
 
-  console.log('✅ Admin créé avec succès :');
-  console.log(`   Email: ${admin.email}`);
-  console.log(`   Password: lot@admin123`);
-  console.log(`   Licence: ${admin.license.key}`);
-  console.log(`   Type: ${admin.license.type}`);
-  console.log(`   Expiration: ${admin.license.endDate.toLocaleDateString()}`);
+  console.log('✅ Admin créé :', admin.email);
 
-  // Création d'utilisateurs de test
-  const hashedPasswordUser = await bcrypt.hash('user123', 10);
-  
-  const endDateFree = new Date();
-  endDateFree.setMonth(endDateFree.getMonth() + 1);
-
+  // Seed User test
   const user1 = await prisma.user.upsert({
-    where: { email: 'user1@lotusbusiness.com' },
+    where: { email: 'user1@test.com' },
     update: {},
     create: {
-      email: 'user1@lotusbusiness.com',
+      email: 'user1@test.com',
+      phone: '+22900000001',
       firstName: 'Jean',
       lastName: 'Dupont',
-      password: hashedPasswordUser,
-      role: 'USER',
-      license: {
-        create: {
-          key: generateLicenseKey(),
-          type: 'FREE',
-          status: 'ACTIVE',
-          startDate: new Date(),
-          endDate: endDateFree,
-        },
-      },
-    },
-    include: {
-      license: true,
+      licenseKey: 'LOT-TEST-user-0001',
+      licenseType: 'FREE',
+      licenseStatus: 'ACTIVE',
     },
   });
 
-  console.log('\n✅ Utilisateur test créé :');
-  console.log(`   Email: ${user1.email}`);
-  console.log(`   Password: user123`);
-  console.log(`   Licence: ${user1.license.key}`);
+  console.log('✅ User test créé :', user1.email);
 
-  console.log('\n🎉 Seeding terminé avec succès !');
+  // Seed License correspondante
+  await prisma.license.upsert({
+    where: { key: 'LOT-TEST-user-0001' },
+    update: {},
+    create: {
+      email: 'user1@test.com',
+      key: 'LOT-TEST-user-0001',
+    },
+  });
+
+  console.log('\n🎉 Seeding terminé !');
 }
 
 main()
   .catch((e) => {
-    console.error('❌ Erreur lors du seeding:', e);
+    console.error('❌ Erreur:', e);
     process.exit(1);
   })
   .finally(async () => {

@@ -5,12 +5,11 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
 }
 
-// Enumérations
 enum LicenseType {
   FREE
   PREMIUM
@@ -40,7 +39,6 @@ enum ActivityType {
   PASSWORD_CHANGED
 }
 
-// Table Users (utilisateurs avec toutes leurs infos + licence)
 model User {
   id                    String        @id @default(uuid())
   email                 String        @unique
@@ -51,26 +49,27 @@ model User {
   licenseType           LicenseType   @default(FREE)
   licenseStatus         LicenseStatus @default(ACTIVE)
   activationDate        DateTime      @default(now())
-  expirationDate        DateTime?     // Nullable - seulement pour PREMIUM
+  expirationDate        DateTime?
   isOnline              Boolean       @default(false)
   lastLoginAt           DateTime?
   activeSessionId       String?       @unique
-  lastLoginIp           String?       // IP du dernier appareil connecté
-  maxSimultaneousLogins Int           @default(1) // FREE=1, PREMIUM=illimité(999)
+  lastLoginIp           String?
+  maxSimultaneousLogins Int           @default(1)
+  expoPushToken         String?
   createdAt             DateTime      @default(now())
 
-  notifications   Notification[]
-  activityLogs    ActivityLog[]  @relation("ActivityTarget")
+  legalAcceptances UserLegalAcceptance[]
+  notifications    Notification[]
+  activityLogs     ActivityLog[]         @relation("ActivityTarget")
 
   @@map("users")
 }
 
-// Table Admins (administrateurs - ajoutés manuellement)
 model Admin {
   id        String   @id @default(uuid())
   email     String   @unique
   phone     String   @unique
-  password  String   // Hash bcrypt
+  password  String
   createdAt DateTime @default(now())
 
   activityLogs ActivityLog[] @relation("ActivityAuthor")
@@ -78,16 +77,15 @@ model Admin {
   @@map("admins")
 }
 
-// Table Licenses (juste email + clé pour retrouver rapidement)
+// Renommé "key" → "licenseKey" pour cohérence avec le reste du code
 model License {
-  id    String @id @default(uuid())
-  email String @unique
-  key   String @unique
+  id         String @id @default(uuid())
+  email      String @unique
+  licenseKey String @unique
 
   @@map("licenses")
 }
 
-// Table Notifications
 model Notification {
   id        String           @id @default(uuid())
   type      NotificationType
@@ -101,7 +99,6 @@ model Notification {
   @@map("notifications")
 }
 
-// Table ActivityLog (journal d'activité)
 model ActivityLog {
   id          String       @id @default(uuid())
   type        ActivityType
@@ -110,7 +107,7 @@ model ActivityLog {
   admin       Admin        @relation("ActivityAuthor", fields: [adminId], references: [id], onDelete: Cascade)
   targetId    String?
   target      User?        @relation("ActivityTarget", fields: [targetId], references: [id], onDelete: SetNull)
-  metadata    String?      // JSON stringifié pour données supplémentaires
+  metadata    String?
   ipAddress   String?
   createdAt   DateTime     @default(now())
 
@@ -118,27 +115,51 @@ model ActivityLog {
 }
 
 model Info {
-  id             String   @id @default(uuid())
-  title          String
-  content        String
-  imageUrl       String?
-  imageFileId    String?  // ImageKit file ID pour suppression
-  imageFilePath  String?  // ImageKit file path
-  thumbnailUrl   String?  // ImageKit thumbnail URL
-  published      Boolean  @default(true)
-  publishedAt    DateTime @default(now())
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id            String   @id @default(uuid())
+  title         String
+  content       String
+  imageUrl      String?
+  imageFileId   String?
+  imageFilePath String?
+  thumbnailUrl  String?
+  published     Boolean  @default(true)
+  publishedAt   DateTime @default(now())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   @@map("infos")
 }
 
 model AppDownload {
-  id          String   @id @default(uuid())
-  ipAddress   String?  // IP pour éviter les doublons
-  userAgent   String?  // Navigateur/OS
-  source      String?  // "website", "qr_code", etc.
-  createdAt   DateTime @default(now())
+  id        String   @id @default(uuid())
+  ipAddress String?
+  userAgent String?
+  source    String?
+  createdAt DateTime @default(now())
 
   @@map("app_downloads")
+}
+
+model LegalDocument {
+  id          String                @id @default(cuid())
+  type        String
+  version     String
+  content     String                @db.Text
+  publishedAt DateTime              @default(now())
+  createdAt   DateTime              @default(now())
+  acceptances UserLegalAcceptance[]
+
+  @@map("legal_documents")
+}
+
+model UserLegalAcceptance {
+  id         String        @id @default(cuid())
+  userId     String
+  user       User          @relation(fields: [userId], references: [id])
+  documentId String
+  document   LegalDocument @relation(fields: [documentId], references: [id])
+  acceptedAt DateTime      @default(now())
+
+  @@unique([userId, documentId])
+  @@map("user_legal_acceptances")
 }
