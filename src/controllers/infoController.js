@@ -84,6 +84,37 @@ const createInfo = async (req, res) => {
       },
     });
 
+    // 📱 Créer une notification pour tous les utilisateurs si l'info est publiée
+    if (info.published) {
+      try {
+        // Récupérer tous les utilisateurs actifs
+        const users = await prisma.user.findMany({
+          where: { licenseStatus: 'ACTIVE' },
+          select: { id: true },
+        });
+
+        // Créer une notification pour chaque utilisateur
+        if (users.length > 0) {
+          const notifications = users.map(user => ({
+            userId: user.id,
+            type: 'NEW_INFO',
+            title: 'Nouvelle information',
+            message: `Nouvelle publication : ${info.title}`,
+            data: { infoId: info.id },
+          }));
+
+          await prisma.notification.createMany({
+            data: notifications,
+          });
+
+          console.log(`📱 Notification envoyée à ${users.length} utilisateurs pour l'info: ${info.title}`);
+        }
+      } catch (notificationError) {
+        console.error('Erreur création notifications:', notificationError);
+        // On continue même si les notifications échouent
+      }
+    }
+
     res.status(201).json({ 
       message: 'Info publiée avec succès',
       info 

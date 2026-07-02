@@ -26,18 +26,23 @@ const generateCompteResultat = async (req, res) => {
       });
     }
 
-    // TODO: Récupérer les vraies données depuis la base de données
-    // Pour l'instant, données de démonstration
-    const chiffreAffaires = 500000; // À remplacer par vraies données
-    const coutAchat = 300000;
-    const chargesDiverses = 50000;
+    // Récupérer les données depuis le body (envoyé par le frontend)
+    const { chiffreAffaires, coutAchat, chargesDiverses } = req.body;
+
+    // Validation des données
+    if (!chiffreAffaires || !coutAchat || chargesDiverses === undefined) {
+      return res.status(400).json({ 
+        error: 'Données manquantes. Veuillez fournir chiffreAffaires, coutAchat et chargesDiverses.' 
+      });
+    }
 
     console.log(`📊 Génération compte de résultat pour ${user.email}`);
+    console.log(`   Données: CA=${chiffreAffaires}, Achats=${coutAchat}, Charges=${chargesDiverses}`);
 
     const result = await aiService.generateCompteResultat({
-      chiffreAffaires,
-      coutAchat,
-      chargesDiverses,
+      chiffreAffaires: parseFloat(chiffreAffaires),
+      coutAchat: parseFloat(coutAchat),
+      chargesDiverses: parseFloat(chargesDiverses),
       periode: periode || `${dateDebut} - ${dateFin}`,
       devise: 'FCFA'
     });

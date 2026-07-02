@@ -10,11 +10,12 @@ Ce document liste toutes les routes disponibles dans le backend de Lotus Busines
 2. [Routes d'Authentification](#routes-dauthentification)
 3. [Routes Utilisateur](#routes-utilisateur)
 4. [Routes Admin](#routes-admin)
-5. [Routes Notifications](#routes-notifications)
-6. [Routes Documents](#routes-documents)
-7. [Routes Téléchargements](#routes-téléchargements)
-8. [Routes Légales](#routes-légales)
-9. [Routes Activité](#routes-activité)
+5. [Routes Devices](#routes-devices)
+6. [Routes Notifications](#routes-notifications)
+7. [Routes Documents](#routes-documents)
+8. [Routes Téléchargements](#routes-téléchargements)
+9. [Routes Légales](#routes-légales)
+10. [Routes Activité](#routes-activité)
 
 ---
 
@@ -237,6 +238,43 @@ Ce document liste toutes les routes disponibles dans le backend de Lotus Busines
 - **Body**: `{ userId }`
 - **Réponse**: `{ message }`
 
+
+---
+
+## 📱 Routes Devices
+
+### POST `/api/devices/register`
+- **Description**: Enregistrer un nouvel appareil (appelé lors du login)
+- **Auth requise**: Oui (User)
+- **Body**: `{ deviceId, deviceName?, deviceType?, platform? }`
+- **Réponse**: `{ message, device }`
+
+### GET `/api/devices/my-devices`
+- **Description**: Récupérer tous les appareils de l'utilisateur connecté
+- **Auth requise**: Oui (User)
+- **Réponse**: `{ count, devices: [] }`
+
+### DELETE `/api/devices/my-devices/:deviceId`
+- **Description**: Supprimer un de mes appareils
+- **Auth requise**: Oui (User)
+- **Réponse**: `{ message }`
+
+### GET `/api/devices/user/:userId`
+- **Description**: Récupérer tous les appareils d'un utilisateur (admin uniquement)
+- **Auth requise**: Oui (Admin)
+- **Réponse**: `{ count, devices: [] }`
+
+### POST `/api/devices/reset`
+- **Description**: Réinitialiser un appareil (admin) - pour débloquer un utilisateur FREE
+- **Auth requise**: Oui (Admin)
+- **Body**: `{ userId, deviceId }`
+- **Réponse**: `{ message, device }`
+
+### DELETE `/api/devices/user/:userId/:deviceId`
+- **Description**: Supprimer un appareil (admin)
+- **Auth requise**: Oui (Admin)
+- **Réponse**: `{ message }`
+
 ---
 
 ## 🔔 Routes Notifications (Admin)
@@ -417,6 +455,44 @@ Le token est obtenu via `/api/auth/login` ou `/api/admin/login`
 
 ---
 
+## 🔒 Sécurité et Validation
+
+### Rate Limiting
+
+Toutes les routes d'authentification sont protégées contre les attaques par force brute :
+
+- **Login user** : 10 tentatives par 15 minutes
+- **Login admin** : 5 tentatives par 15 minutes
+- **Forgot-key** : 5 tentatives par heure
+- **Register** : 10 tentatives par 15 minutes
+
+### Validation des Entrées
+
+Toutes les entrées sont validées avec Zod avant traitement :
+
+- **Email** : Format valide requis
+- **Téléphone** : 8-20 caractères
+- **Noms** : 2-50 caractères
+- **Clé de licence** : Format strict `LOT-1234-ABCD-5678`
+- **Mot de passe admin** : 8+ caractères, majuscule, minuscule, chiffre
+
+### Device Binding
+
+Système de tracking des appareils pour sécurité renforcée :
+
+- **Enregistrement automatique** lors du login
+- **Historique des appareils** par utilisateur
+- **Reset device** par admin pour débloquer les utilisateurs FREE
+- **Contrôle total** des appareils autorisés
+
+### Messages de Sécurité
+
+- **Forgot-key** : Message générique (pas d'énumération d'emails)
+- **Mail-status** : Ne révèle pas la clé API Brevo
+- **Bootstrap admin** : Premier admin public, suivants protégés
+
+---
+
 ## 🔧 Variables d'environnement requises
 
 - `DATABASE_URL`: URL PostgreSQL (Supabase)
@@ -427,9 +503,9 @@ Le token est obtenu via `/api/auth/login` ou `/api/admin/login`
 - `IMAGEKIT_PUBLIC_KEY`: Clé publique ImageKit
 - `IMAGEKIT_PRIVATE_KEY`: Clé privée ImageKit
 - `IMAGEKIT_URL_ENDPOINT`: Endpoint ImageKit
-- `OPENAI_API_KEY`: Clé API OpenAI (documents)
-- `GEMINI_API_KEY`: Clé API Gemini (documents)
-- `PERPLEXITY_API_KEY`: Clé API Perplexity (documents)
+- `MISTRAL_API_KEY`: Clé API Mistral (documents)
+- `GROQ_API_KEY`: Clé API Groq (documents)
+
 
 ---
 
