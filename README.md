@@ -6,6 +6,53 @@ Backend Node.js/Express pour l'application de gestion commerciale Lotus Business
 
 ## 🆕 Dernières Mises à Jour (Juin 2026)
 
+### 🔒 Sécurité Renforcée - Niveau Production
+
+#### 🎯 Nouvelles Sécurités Implémentées
+
+1. **Rate Limiting** - Protection contre les attaques par force brute
+   - `express-rate-limit` installé et configuré
+   - Login : 10 tentatives/15 minutes
+   - Admin login : 5 tentatives/15 minutes
+   - Forgot-key : 5 tentatives/heure
+   - **Impact** : Impossible de faire du brute-force sur les mots de passe
+
+2. **Validation Systématique des Entrées (Zod)**
+   - Validation de tous les inputs sur les routes critiques
+   - Email : format valide requis
+   - Téléphone : 8-20 caractères
+   - Noms : 2-50 caractères
+   - Clé de licence : format `LOT-1234-ABCD-5678` strict
+   - Mot de passe admin : 8+ caractères, majuscule, minuscule, chiffre
+   - **Impact** : Pas de données invalides en base de données
+
+3. **Générateur de Clé Cryptographiquement Sûr**
+   - Remplacé `Math.random()` par `crypto.randomInt()`
+   - Clés de licence non prévisibles
+   - **Impact** : Sécurité maximale des licences
+
+4. **Protection Route Admin/Create**
+   - Système de bootstrap : premier admin public, suivants protégés
+   - Vérification authentification admin pour création d'admins supplémentaires
+   - **Impact** : Impossible de créer des admins arbitrairement
+
+5. **Sécurisation Mail-Status**
+   - Ne révèle plus la clé API Brevo
+   - Retourne seulement `configured: true/false`
+   - **Impact** : Pas de fuite d'informations sensibles
+
+6. **Message Générique Forgot-Key**
+   - "Si ce compte existe, un email vous a été envoyé"
+   - Ne révèle pas si l'email existe ou non
+   - **Impact** : Pas d'énumération d'emails
+
+7. **Device Binding Complet**
+   - Table `devices` pour tracker les appareils
+   - Enregistrement automatique lors du login
+   - Gestion des devices (CRUD)
+   - Reset device par admin (débloquer utilisateurs FREE)
+   - **Impact** : Contrôle total des appareils utilisés
+
 ### ✅ Corrections Majeures - Synchronisation et Messages d'Erreur
 
 #### 🔧 Problèmes Résolés

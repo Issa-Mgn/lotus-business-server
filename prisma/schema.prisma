@@ -77,6 +77,7 @@ model User {
   legalAcceptances UserLegalAcceptance[]
   notifications    Notification[]
   activityLogs     ActivityLog[]         @relation("ActivityTarget")
+  devices          Device[]
 
   @@map("users")
 }
@@ -196,4 +197,22 @@ model UserLegalAcceptance {
 
   @@unique([userId, documentId])
   @@map("user_legal_acceptances")
+}
+
+model Device {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deviceId     String   // UUID unique de l'appareil
+  deviceName   String?  // Nom optionnel de l'appareil (ex: "iPhone 13", "Samsung S21")
+  deviceType   String?  // Type: "ios" | "android"
+  platform     String?  // Platforme: "ios" | "android" (stocké comme string)
+  isAuthorized Boolean  @default(true) // Appareil autorisé
+  lastUsedAt   DateTime @default(now())
+  createdAt    DateTime @default(now())
+
+  @@unique([userId, deviceId])
+  @@index([userId])
+  @@index([deviceId])
+  @@map("devices")
 }

@@ -32,14 +32,16 @@ const {
 
 const auth = require('../middlewares/auth');
 const isAdmin = require('../middlewares/isAdmin');
+const { adminLoginLimiter } = require('../middlewares/rateLimiter');
+const { validate, adminLoginSchema, createAdminSchema, createUserSchema, updateUserSchema } = require('../validators/authValidators');
 
 const router = express.Router();
 
-// Login admin (public)
-router.post('/login', loginAdmin);
+// Login admin (public) avec rate limiting et validation
+router.post('/login', adminLoginLimiter, validate(adminLoginSchema), loginAdmin);
 
 // Créer un admin (public pour le premier admin, à sécuriser ensuite)
-router.post('/create', createAdmin);
+router.post('/create', validate(createAdminSchema), createAdmin);
 
 // Infos publiques consommables par l'application mobile
 router.get('/infos/public', getPublishedInfos);
@@ -72,14 +74,14 @@ router.use(isAdmin);
 router.get('/profile', getProfile);
 router.post('/change-password', changePassword);
 
-// Gestion users
+// Gestion users avec validation
 router.get('/users', getAllUsers);
-router.post('/users', createUserFromAdmin);
+router.post('/users', validate(createUserSchema), createUserFromAdmin);
 router.post('/upgrade-premium', upgradeToPremium);
 router.patch('/suspend/:userId', suspendUser);
 router.post('/reactivate-license', reactivateLicense);
 router.post('/force-logout/:userId', forceLogout);
-router.patch('/users/:userId', updateUser);
+router.patch('/users/:userId', validate(updateUserSchema), updateUser);
 router.delete('/users/:userId', deleteUser);
 
 // Gestion admins

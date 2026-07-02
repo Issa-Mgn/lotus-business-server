@@ -243,12 +243,29 @@ const forceLogout = async (req, res) => {
   }
 };
 
+/**
+ * Créer un admin - PROTÉGÉ sauf pour le bootstrap (premier admin)
+ * Si aucun admin n'existe : autorisé (initialisation du système)
+ * Si des admins existent : nécessite authentification admin
+ */
 const createAdmin = async (req, res) => {
   try {
     const { email, phone, password } = req.body;
 
     if (!email || !phone || !password) {
       return res.status(400).json({ error: 'Email, téléphone et mot de passe requis' });
+    }
+
+    // Vérifier si c'est le bootstrap (premier admin)
+    const adminCount = await prisma.admin.count();
+    const isBootstrap = adminCount === 0;
+
+    // Si ce n'est pas le bootstrap, vérifier l'authentification
+    if (!isBootstrap) {
+      // Vérifier que l'utilisateur est authentifié en tant qu'admin
+      if (!req.userId || !req.userType || req.userType !== 'admin') {
+        return res.status(401).json({ error: 'Authentification admin requise' });
+      }
     }
 
     const existingAdmin = await prisma.admin.findUnique({ where: { email } });
@@ -269,7 +286,9 @@ const createAdmin = async (req, res) => {
     });
 
     res.status(201).json({
-      message: 'Admin créé avec succès',
+      message: isBootstrap 
+        ? 'Premier admin créé avec succès. Vous pouvez maintenant vous connecter.' 
+        : 'Admin créé avec succès',
       admin: newAdmin,
     });
   } catch (error) {
@@ -653,9 +672,10 @@ const getAllInfos = async (req, res) => {
 
 const mailStatus = async (req, res) => {
   try {
+    // Ne jamais exposer la clé API complète, seulement indiquer si elle est configurée
     const status = {
-      BREVO_API_KEY: !!process.env.BREVO_API_KEY,
-      BREVO_SENDER_EMAIL: !!process.env.BREVO_SENDER_EMAIL,
+      configured: !!(process.env.BREVO_API_KEY && process.env.BREVO_SENDER_EMAIL),
+      senderEmail: !!process.env.BREVO_SENDER_EMAIL,
       brevoInitialized: !!brevo,
     };
 

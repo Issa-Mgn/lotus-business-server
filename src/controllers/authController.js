@@ -226,6 +226,26 @@ const login = async (req, res) => {
       }
     });
 
+    // 📱 Enregistrer le device (si fourni)
+    const { deviceId, deviceName, deviceType, platform } = req.body;
+    if (deviceId) {
+      try {
+        const { registerDevice } = require('../controllers/deviceController');
+        // Appel asynchrone (non bloquant pour le login)
+        registerDevice({ 
+          userId: user.id, 
+          body: { deviceId, deviceName, deviceType, platform } 
+        }, { 
+          json: () => {}, 
+          status: () => ({ json: () => {} }) 
+        }).catch(err => {
+          console.error('Erreur enregistrement device (non bloquant):', err);
+        });
+      } catch (err) {
+        console.error('Erreur require deviceController:', err);
+      }
+    }
+
     console.log(`✅ Connexion réussie - ${user.email} (${user.licenseType}) depuis IP: ${currentIp}`);
 
     res.json({
@@ -253,6 +273,7 @@ const login = async (req, res) => {
 
 /**
  * Récupération clé par email
+ * Message générique pour ne pas révéler si l'email existe ou non
  */
 const forgotKey = async (req, res) => {
   try {
@@ -262,45 +283,42 @@ const forgotKey = async (req, res) => {
       return res.status(400).json({ error: 'Email requis' });
     }
 
-    // Recherche dans table Licenses
+    // Recherche dans table Licenses (mais on ne révèle pas le résultat)
     const license = await prisma.license.findUnique({
       where: { email },
     });
 
-    if (!license) {
-      return res.status(404).json({ 
-        error: 'Aucun compte avec cet email' 
+    // Si le compte existe, envoyer l'email (non bloquant)
+    if (license) {
+      // Récupération du user pour le prénom
+      const user = await prisma.user.findUnique({
+        where: { email },
       });
+
+      // Renvoi email avec le template via Brevo (non bloquant)
+      try {
+        const { sendLicenseRecovery } = require('../services/mailService');
+        sendLicenseRecovery(
+          email,
+          user?.firstName || 'Utilisateur',
+          license.licenseKey, // Corriger: license.key → license.licenseKey
+          welcomeTemplate(user?.firstName || 'Utilisateur', license.licenseKey, user?.expirationDate || null, user?.licenseType || 'FREE'),
+          welcomeTemplateText(user?.firstName || 'Utilisateur', license.licenseKey, user?.expirationDate || null, user?.licenseType || 'FREE')
+        ).then((result) => {
+          if (!result || !result.success) {
+            console.error('Erreur envoi email forgot-key:', result?.error || 'unknown');
+          }
+        }).catch((error) => {
+          console.error('Erreur envoi email forgot-key:', error);
+        });
+      } catch (err) {
+        console.error('Erreur require mailService:', err);
+      }
     }
 
-    // Récupération du user pour le prénom
-    const user = await prisma.user.findUnique({
-      where: { email },
-    });
-
-    // Renvoi email avec le template via Brevo (non bloquant)
-    try {
-      const { sendLicenseRecovery } = require('../services/mailService');
-      sendLicenseRecovery(
-        email,
-        user?.firstName || 'Utilisateur',
-        license.key,
-        welcomeTemplate(user?.firstName || 'Utilisateur', license.key, user?.expirationDate || null, user?.licenseType || 'FREE'),
-        welcomeTemplateText(user?.firstName || 'Utilisateur', license.key, user?.expirationDate || null, user?.licenseType || 'FREE')
-      ).then((result) => {
-        if (!result || !result.success) {
-          console.error('Erreur envoi email forgot-key:', result?.error || 'unknown');
-        }
-      }).catch((error) => {
-        console.error('Erreur envoi email forgot-key:', error);
-      });
-    } catch (err) {
-      console.error('Erreur require mailService:', err);
-    }
-
+    // Message générique (ne révèle pas si l'email existe ou non)
     res.json({
-      message: 'Clé renvoyée par email',
-      email: email.replace(/(.{2})(.*)(@.*)/, '$1***$3'),
+      message: 'Si ce compte existe, un email avec votre clé de licence vous a été envoyé.',
     });
   } catch (error) {
     console.error('Erreur forgot key:', error);
