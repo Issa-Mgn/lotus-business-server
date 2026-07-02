@@ -203,7 +203,7 @@ Créer un environnement Postman avec ces variables :
 
 ---
 
-### **ÉTAPE 6 : Créer une Info (avec notification automatique)**
+### **ÉTAPE 6 : Créer une Info (avec notification automatique et images multiples)**
 
 **Méthode** : `POST`  
 **URL** : `{{base_url}}/api/admin/infos`  
@@ -212,10 +212,35 @@ Créer un environnement Postman avec ces variables :
 
 **Body** (raw JSON) :
 
+**Option 1 : Sans image**
 ```json
 {
   "title": "Nouvelle fonctionnalité !",
   "content": "Découvrez notre nouvelle fonctionnalité de génération de documents comptables avec IA.",
+  "published": true
+}
+```
+
+**Option 2 : Avec une seule image (legacy)**
+```json
+{
+  "title": "Nouvelle fonctionnalité !",
+  "content": "Découvrez...",
+  "imageBase64": "data:image/jpeg;base64,/9j/4AAQ...",
+  "published": true
+}
+```
+
+**Option 3 : Avec plusieurs images (NOUVEAU)**
+```json
+{
+  "title": "Galerie photos",
+  "content": "Plusieurs images dans cette publication",
+  "images": [
+    "data:image/jpeg;base64,/9j/4AAQ...",
+    "data:image/jpeg;base64,/9j/4AAQ...",
+    "data:image/jpeg;base64,/9j/4AAQ..."
+  ],
   "published": true
 }
 ```
@@ -226,9 +251,23 @@ Créer un environnement Postman avec ces variables :
   "message": "Info publiée avec succès",
   "info": {
     "id": "uuid",
-    "title": "Nouvelle fonctionnalité !",
-    "content": "Découvrez notre nouvelle fonctionnalité...",
-    "imageUrl": null,
+    "title": "Galerie photos",
+    "content": "Plusieurs images...",
+    "imageUrl": "https://ik.imagekit.io/...",  // Première image
+    "images": [
+      {
+        "url": "https://ik.imagekit.io/...",
+        "fileId": "info-123456-1.jpg",
+        "filePath": "/infos/info-123456-1.jpg",
+        "thumbnailUrl": "https://ik.imagekit.io/.../tr:w-200"
+      },
+      {
+        "url": "https://ik.imagekit.io/...",
+        "fileId": "info-123456-2.jpg",
+        "filePath": "/infos/info-123456-2.jpg",
+        "thumbnailUrl": "https://ik.imagekit.io/.../tr:w-200"
+      }
+    ],
     "published": true,
     "publishedAt": "2026-06-27T...",
     "createdAt": "2026-06-27T..."
@@ -238,13 +277,18 @@ Créer un environnement Postman avec ces variables :
 
 **✅ Actions** : 
 1. Copier l'`id` dans la variable `info_id`
-2. Vérifier les logs du serveur : `📱 Notification envoyée à X utilisateurs pour l'info: Nouvelle fonctionnalité !`
+2. Vérifier les logs du serveur : `📱 Notification envoyée à X utilisateurs pour l'info: ...`
 
 **📱 Notification automatique** : 
 - Tous les utilisateurs actifs reçoivent une notification
 - Type : `NEW_INFO`
 - Titre : `Nouvelle information`
-- Message : `Nouvelle publication : Nouvelle fonctionnalité !`
+- Message : `Nouvelle publication : {titre}`
+
+**🖼️ Images multiples** :
+- Première image = image principale (imageUrl)
+- Images supplémentaires = tableau `images[]`
+- Pas de limite du nombre d'images
 
 ---
 

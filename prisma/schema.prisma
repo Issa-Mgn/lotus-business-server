@@ -1,3 +1,4 @@
+
 // c:\Mes Travaux\Lotus Business\server\prisma\schema.prisma
 
 generator client {
@@ -141,6 +142,7 @@ model Info {
   imageFileId   String?
   imageFilePath String?
   thumbnailUrl  String?
+  images        Json?      // Tableau d'images multiples [{url, fileId, filePath, thumbnailUrl}]
   published     Boolean    @default(true)
   publishedAt   DateTime   @default(now())
   createdAt     DateTime   @default(now())

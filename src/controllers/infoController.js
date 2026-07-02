@@ -46,23 +46,38 @@ const getAllInfos = async (req, res) => {
 };
 
 /**
- * Créer une nouvelle info avec image
+ * Créer une nouvelle info avec images multiples
  */
 const createInfo = async (req, res) => {
   try {
-    const { title, content, imageBase64, published } = req.body;
+    const { title, content, images, published } = req.body;
 
     if (!title || !content) {
       return res.status(400).json({ error: 'Titre et contenu requis' });
     }
 
-    let imageData = null;
+    let mainImageData = null;
+    const uploadedImages = [];
 
-    // Upload de l'image si fournie
-    if (imageBase64) {
+    // Support pour image unique (legacy) ou tableau d'images
+    const imagesArray = Array.isArray(images) ? images : (images ? [images] : []);
+
+    // Upload de la première image comme image principale (legacy)
+    if (imagesArray.length > 0 && !req.body.imageBase64) {
+      try {
+        const fileName = `info-${Date.now()}-0.jpg`;
+        mainImageData = await uploadImage(imagesArray[0], fileName, 'infos');
+      } catch (uploadError) {
+        console.error('Erreur upload image principale:', uploadError.message);
+        return res.status(400).json({ 
+          error: uploadError.message || 'Erreur lors de l\'upload de l\'image principale' 
+        });
+      }
+    } else if (req.body.imageBase64) {
+      // Support legacy pour imageBase64
       try {
         const fileName = `info-${Date.now()}.jpg`;
-        imageData = await uploadImage(imageBase64, fileName, 'infos');
+        mainImageData = await uploadImage(req.body.imageBase64, fileName, 'infos');
       } catch (uploadError) {
         console.error('Erreur upload image:', uploadError.message);
         return res.status(400).json({ 
@@ -71,14 +86,34 @@ const createInfo = async (req, res) => {
       }
     }
 
+    // Upload des images supplémentaires
+    if (imagesArray.length > 1) {
+      for (let i = 1; i < imagesArray.length; i++) {
+        try {
+          const fileName = `info-${Date.now()}-${i}.jpg`;
+          const imageData = await uploadImage(imagesArray[i], fileName, 'infos');
+          uploadedImages.push({
+            url: imageData.url,
+            fileId: imageData.fileId,
+            filePath: imageData.filePath,
+            thumbnailUrl: imageData.thumbnailUrl,
+          });
+        } catch (uploadError) {
+          console.error(`Erreur upload image ${i}:`, uploadError.message);
+          // Continue avec les autres images même si une échoue
+        }
+      }
+    }
+
     const info = await prisma.info.create({
       data: {
         title,
         content,
-        imageUrl: imageData?.url || null,
-        imageFileId: imageData?.fileId || null,
-        imageFilePath: imageData?.filePath || null,
-        thumbnailUrl: imageData?.thumbnailUrl || null,
+        imageUrl: mainImageData?.url || null,
+        imageFileId: mainImageData?.fileId || null,
+        imageFilePath: mainImageData?.filePath || null,
+        thumbnailUrl: mainImageData?.thumbnailUrl || null,
+        images: uploadedImages.length > 0 ? uploadedImages : null,
         published: published !== undefined ? published : true,
         publishedAt: new Date(),
       },
