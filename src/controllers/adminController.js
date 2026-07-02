@@ -113,7 +113,7 @@ const getAllAdmins = async (req, res) => {
 
 const upgradeToPremium = async (req, res) => {
   try {
-    const { userId } = req.body;
+    const { userId, subscriptionType = 'MONTHLY' } = req.body;
 
     if (!userId) {
       return res.status(400).json({ error: 'userId requis' });
@@ -125,15 +125,25 @@ const upgradeToPremium = async (req, res) => {
       return res.status(404).json({ error: 'User introuvable' });
     }
 
-    // PREMIUM = 1 mois (999 FCFA/mois selon CDC)
     const newExpirationDate = new Date();
-    newExpirationDate.setMonth(newExpirationDate.getMonth() + 1);
+    let message = '';
+
+    if (subscriptionType === 'ANNUAL') {
+      // Abonnement annuel : 10000 FCFA/an
+      newExpirationDate.setFullYear(newExpirationDate.getFullYear() + 1);
+      message = 'User upgradé en PREMIUM ANNUEL (10000 FCFA/an)';
+    } else {
+      // Abonnement mensuel : 999 FCFA/mois
+      newExpirationDate.setMonth(newExpirationDate.getMonth() + 1);
+      message = 'User upgradé en PREMIUM MENSUEL (999 FCFA/mois)';
+    }
 
     const updatedUser = await prisma.user.update({
       where: { id: userId },
       data: {
         licenseType: 'PREMIUM',
         licenseStatus: 'ACTIVE',
+        subscriptionType: subscriptionType,
         activationDate: new Date(),
         expirationDate: newExpirationDate,
         maxSimultaneousLogins: 999, // PREMIUM = connexions illimitées
@@ -141,7 +151,7 @@ const upgradeToPremium = async (req, res) => {
     });
 
     res.json({
-      message: 'User upgradé en PREMIUM (1 mois)',
+      message,
       user: updatedUser,
     });
   } catch (error) {

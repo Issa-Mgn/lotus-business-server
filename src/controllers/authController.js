@@ -230,19 +230,50 @@ const login = async (req, res) => {
     const { deviceId, deviceName, deviceType, platform } = req.body;
     if (deviceId) {
       try {
-        const { registerDevice } = require('../controllers/deviceController');
-        // Appel asynchrone (non bloquant pour le login)
-        registerDevice({ 
-          userId: user.id, 
-          body: { deviceId, deviceName, deviceType, platform } 
-        }, { 
-          json: () => {}, 
-          status: () => ({ json: () => {} }) 
-        }).catch(err => {
-          console.error('Erreur enregistrement device (non bloquant):', err);
+        // Enregistrer le device directement avec Prisma (synchrone)
+        const existingDevice = await prisma.device.findUnique({
+          where: {
+            userId_deviceId: {
+              userId: user.id,
+              deviceId
+            }
+          }
         });
+
+        if (existingDevice) {
+          // Mettre à jour la date de dernière utilisation
+          await prisma.device.update({
+            where: {
+              userId_deviceId: {
+                userId: user.id,
+                deviceId
+              }
+            },
+            data: {
+              lastUsedAt: new Date(),
+              deviceName: deviceName || existingDevice.deviceName,
+              deviceType: deviceType || existingDevice.deviceType,
+              platform: platform || existingDevice.platform,
+            }
+          });
+          console.log(`📱 Device mis à jour: ${deviceId}`);
+        } else {
+          // Créer un nouvel appareil
+          await prisma.device.create({
+            data: {
+              userId: user.id,
+              deviceId,
+              deviceName,
+              deviceType,
+              platform,
+              isAuthorized: true,
+            }
+          });
+          console.log(`📱 Nouveau device enregistré: ${deviceId}`);
+        }
       } catch (err) {
-        console.error('Erreur require deviceController:', err);
+        console.error('Erreur enregistrement device:', err);
+        // On continue même si l'enregistrement du device échoue
       }
     }
 

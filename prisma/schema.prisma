@@ -22,6 +22,11 @@ enum LicenseStatus {
   SUSPENDED
 }
 
+enum SubscriptionType {
+  MONTHLY
+  ANNUAL
+}
+
 enum NotificationType {
   LICENSE_EXPIRED
   LICENSE_EXPIRING_SOON
@@ -64,6 +69,7 @@ model User {
   licenseKey            String        @unique
   licenseType           LicenseType   @default(FREE)
   licenseStatus         LicenseStatus @default(ACTIVE)
+  subscriptionType      SubscriptionType? @default(MONTHLY) // MONTHLY ou ANNUAL
   activationDate        DateTime      @default(now())
   expirationDate        DateTime?
   isOnline              Boolean       @default(false)
