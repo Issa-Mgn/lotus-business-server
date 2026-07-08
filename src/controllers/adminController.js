@@ -254,9 +254,9 @@ const forceLogout = async (req, res) => {
 };
 
 /**
- * Créer un admin - PROTÉGÉ sauf pour le bootstrap (premier admin)
- * Si aucun admin n'existe : autorisé (initialisation du système)
- * Si des admins existent : nécessite authentification admin
+ * Créer un admin
+ * - Route publique /create : uniquement pour le bootstrap (premier admin)
+ * - Route protégée /admins (POST) : pour créer d'autres admins (nécessite auth)
  */
 const createAdmin = async (req, res) => {
   try {
@@ -270,18 +270,30 @@ const createAdmin = async (req, res) => {
     const adminCount = await prisma.admin.count();
     const isBootstrap = adminCount === 0;
 
-    // Si ce n'est pas le bootstrap, vérifier l'authentification
-    if (!isBootstrap) {
-      // Vérifier que l'utilisateur est authentifié en tant qu'admin
-      if (!req.userId || !req.userType || req.userType !== 'admin') {
-        return res.status(401).json({ error: 'Authentification admin requise' });
-      }
+    // Si ce n'est pas le bootstrap et que c'est la route /create (publique)
+    // On bloque pour éviter la création non autorisée
+    if (!isBootstrap && !req.userId) {
+      return res.status(403).json({ 
+        error: 'Le premier admin existe déjà. Utilisez l\'authentification pour créer d\'autres admins.',
+        hint: 'Connectez-vous en tant qu\'admin pour créer de nouveaux comptes administrateurs.'
+      });
+    }
+
+    // Si ce n'est pas le bootstrap et qu'on est authentifié, vérifier que c'est un admin
+    if (!isBootstrap && req.userId && req.userType !== 'admin') {
+      return res.status(403).json({ error: 'Seuls les administrateurs peuvent créer d\'autres admins' });
     }
 
     const existingAdmin = await prisma.admin.findUnique({ where: { email } });
 
     if (existingAdmin) {
       return res.status(400).json({ error: 'Un admin avec cet email existe déjà' });
+    }
+
+    // Vérifier si le téléphone est déjà utilisé
+    const existingPhone = await prisma.admin.findUnique({ where: { phone } });
+    if (existingPhone) {
+      return res.status(400).json({ error: 'Ce numéro de téléphone est déjà utilisé' });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -303,6 +315,18 @@ const createAdmin = async (req, res) => {
     });
   } catch (error) {
     console.error('Erreur création admin:', error);
+    
+    // Gestion des erreurs Prisma
+    if (error.code === 'P2002') {
+      const field = error.meta?.target?.[0];
+      if (field === 'email') {
+        return res.status(400).json({ error: 'Cet email est déjà utilisé' });
+      } else if (field === 'phone') {
+        return res.status(400).json({ error: 'Ce numéro de téléphone est déjà utilisé' });
+      }
+      return res.status(400).json({ error: 'Ces informations sont déjà utilisées' });
+    }
+    
     res.status(500).json({ error: 'Erreur création admin' });
   }
 };

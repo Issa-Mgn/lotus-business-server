@@ -40,7 +40,7 @@ const router = express.Router();
 // Login admin (public) avec rate limiting et validation
 router.post('/login', adminLoginLimiter, validate(adminLoginSchema), loginAdmin);
 
-// Créer un admin (public pour le premier admin, à sécuriser ensuite)
+// Créer le premier admin (bootstrap) - public uniquement si aucun admin n'existe
 router.post('/create', validate(createAdminSchema), createAdmin);
 
 // Infos publiques consommables par l'application mobile
@@ -86,6 +86,7 @@ router.delete('/users/:userId', deleteUser);
 
 // Gestion admins
 router.get('/admins', getAllAdmins);
+router.post('/admins', validate(createAdminSchema), createAdmin); // Créer un admin (authentifié)
 
 // Emails
 router.get('/mail-status', mailStatus);
