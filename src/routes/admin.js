@@ -43,6 +43,21 @@ router.post('/login', adminLoginLimiter, validate(adminLoginSchema), loginAdmin)
 // Créer le premier admin (bootstrap) - public uniquement si aucun admin n'existe
 router.post('/create', validate(createAdminSchema), createAdmin);
 
+// Route de vérification du déploiement (public)
+router.get('/deployment-check', (req, res) => {
+  res.json({
+    status: 'OK',
+    timestamp: new Date().toISOString(),
+    routes: {
+      createBootstrap: 'POST /admin/create (public)',
+      createAdmin: 'POST /admin/admins (protected)',
+      getAllAdmins: 'GET /admin/admins (protected)'
+    },
+    commit: 'af08871',
+    message: 'Admin routes configured correctly'
+  });
+});
+
 // Infos publiques consommables par l'application mobile
 router.get('/infos/public', getPublishedInfos);
 
