@@ -260,19 +260,28 @@ const forceLogout = async (req, res) => {
  */
 const createAdmin = async (req, res) => {
   try {
+    console.log('[createAdmin] Début de la requête');
+    console.log('[createAdmin] req.userId:', req.userId);
+    console.log('[createAdmin] req.userType:', req.userType);
+    console.log('[createAdmin] req.body:', { email: req.body.email, phone: req.body.phone, hasPassword: !!req.body.password });
+
     const { email, phone, password } = req.body;
 
     if (!email || !phone || !password) {
+      console.log('[createAdmin] Champs manquants');
       return res.status(400).json({ error: 'Email, téléphone et mot de passe requis' });
     }
 
     // Vérifier si c'est le bootstrap (premier admin)
+    console.log('[createAdmin] Vérification du nombre d\'admins...');
     const adminCount = await prisma.admin.count();
     const isBootstrap = adminCount === 0;
+    console.log('[createAdmin] adminCount:', adminCount, 'isBootstrap:', isBootstrap);
 
     // Si ce n'est pas le bootstrap et que c'est la route /create (publique)
     // On bloque pour éviter la création non autorisée
     if (!isBootstrap && !req.userId) {
+      console.log('[createAdmin] Bloqué: pas de bootstrap et pas d\'auth');
       return res.status(403).json({ 
         error: 'Le premier admin existe déjà. Utilisez l\'authentification pour créer d\'autres admins.',
         hint: 'Connectez-vous en tant qu\'admin pour créer de nouveaux comptes administrateurs.'
@@ -281,23 +290,30 @@ const createAdmin = async (req, res) => {
 
     // Si ce n'est pas le bootstrap et qu'on est authentifié, vérifier que c'est un admin
     if (!isBootstrap && req.userId && req.userType !== 'admin') {
+      console.log('[createAdmin] Bloqué: userType n\'est pas admin:', req.userType);
       return res.status(403).json({ error: 'Seuls les administrateurs peuvent créer d\'autres admins' });
     }
 
+    console.log('[createAdmin] Vérification email existant...');
     const existingAdmin = await prisma.admin.findUnique({ where: { email } });
 
     if (existingAdmin) {
+      console.log('[createAdmin] Email déjà utilisé:', email);
       return res.status(400).json({ error: 'Un admin avec cet email existe déjà' });
     }
 
     // Vérifier si le téléphone est déjà utilisé
+    console.log('[createAdmin] Vérification téléphone existant...');
     const existingPhone = await prisma.admin.findUnique({ where: { phone } });
     if (existingPhone) {
+      console.log('[createAdmin] Téléphone déjà utilisé:', phone);
       return res.status(400).json({ error: 'Ce numéro de téléphone est déjà utilisé' });
     }
 
+    console.log('[createAdmin] Hash du mot de passe...');
     const hashedPassword = await bcrypt.hash(password, 10);
 
+    console.log('[createAdmin] Création de l\'admin dans la DB...');
     const newAdmin = await prisma.admin.create({
       data: {
         email,
@@ -307,6 +323,7 @@ const createAdmin = async (req, res) => {
       select: publicAdminFields,
     });
 
+    console.log('[createAdmin] Admin créé avec succès:', newAdmin.id);
     res.status(201).json({
       message: isBootstrap 
         ? 'Premier admin créé avec succès. Vous pouvez maintenant vous connecter.' 
@@ -314,7 +331,10 @@ const createAdmin = async (req, res) => {
       admin: newAdmin,
     });
   } catch (error) {
-    console.error('Erreur création admin:', error);
+    console.error('[createAdmin] ERREUR COMPLÈTE:', error);
+    console.error('[createAdmin] Error stack:', error.stack);
+    console.error('[createAdmin] Error code:', error.code);
+    console.error('[createAdmin] Error meta:', error.meta);
     
     // Gestion des erreurs Prisma
     if (error.code === 'P2002') {
@@ -327,7 +347,10 @@ const createAdmin = async (req, res) => {
       return res.status(400).json({ error: 'Ces informations sont déjà utilisées' });
     }
     
-    res.status(500).json({ error: 'Erreur création admin' });
+    res.status(500).json({ 
+      error: 'Erreur création admin',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 };
 
