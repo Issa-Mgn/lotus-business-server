@@ -4,9 +4,86 @@ Backend Node.js/Express pour l'application de gestion commerciale Lotus Business
 
 ---
 
-## 🆕 Dernières Mises à Jour (Juin 2026)
+## 🆕 Dernières Mises à Jour (Juillet 2026)
 
-### 🔒 Sécurité Renforcée - Niveau Production
+### ☁️ Système de Cloud Backup - Nouvelle Fonctionnalité Majeure
+
+#### 🎯 Concept Marketing Innovant
+
+Un système de sauvegarde cloud avec stratégie freemium :
+- **Utilisateurs FREE** : Données sauvegardées automatiquement mais **pas d'accès** (doivent upgrader pour récupérer)
+- **Utilisateurs PREMIUM** : Peuvent synchroniser et restaurer leurs données à volonté
+- **Stockage** : Supabase Storage (bucket privé `user-backups`)
+- **Format** : Fichiers `.db` (SQLite) jusqu'à 50 MB
+
+#### 📦 Fonctionnalités
+
+1. **Upload automatique des backups** :
+   - FREE : Backup sauvegardé, marqué comme non accessible
+   - PREMIUM : Backup sauvegardé et immédiatement accessible
+   - Message d'upgrade affiché aux utilisateurs FREE
+
+2. **Liste des backups** :
+   - Tous les utilisateurs voient leurs backups
+   - FREE : `canDownload: false`, `downloadUrl: null`
+   - PREMIUM : `canDownload: true`, `downloadUrl` présent
+
+3. **Téléchargement** :
+   - FREE : **403 Forbidden** avec message d'upgrade
+   - PREMIUM : URL de téléchargement signée (valide 1h)
+
+4. **Admin** :
+   - Peut accorder l'accès à un backup spécifique pour un FREE (après paiement)
+   - Route `POST /api/backups/grant-access`
+
+#### 🔧 Routes API Backups
+
+```http
+POST   /api/backups/upload              # Upload backup (FREE et PREMIUM)
+GET    /api/backups/my-backups          # Lister ses backups
+GET    /api/backups/:backupId/download  # Télécharger (PREMIUM uniquement)
+DELETE /api/backups/:backupId           # Supprimer un backup
+POST   /api/backups/grant-access        # [ADMIN] Accorder accès à un FREE
+```
+
+#### 📊 Configuration Supabase Storage
+
+```bash
+npm run setup:bucket  # Créer le bucket user-backups
+```
+
+Variables d'environnement requises :
+```env
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_SERVICE_KEY=your_service_role_key_here
+```
+
+**Plan FREE Supabase suffisant** :
+- 1 GB de stockage (≈ 100-200 backups de 5-10 MB)
+- 2 GB de bande passante/mois
+
+#### 🎯 Flow Utilisateur
+
+**FREE User :**
+1. Upload backup → "Backup sauvegardé. Passez à PREMIUM pour y accéder."
+2. Liste backups → Voit ses backups mais `canDownload: false`
+3. Tentative download → **403** "Cette fonctionnalité est réservée aux utilisateurs PREMIUM"
+4. Perte de téléphone → Contacte le support → Paye → Admin accorde l'accès
+
+**PREMIUM User :**
+1. Upload backup → "Backup sauvegardé et accessible dans le cloud"
+2. Liste backups → Voit ses backups avec `downloadUrl`
+3. Download → Reçoit URL signée, télécharge le fichier
+4. Peut synchroniser/restaurer à volonté
+
+#### 📝 Documentation Complète
+
+- `BACKUP_SYSTEM.md` - Documentation technique complète
+- `TEST_BACKUP_LOCAL.md` - Guide de test en local avec Postman
+
+---
+
+### 🔒 Sécurité Renforcée - Niveau Production (Juin 2026)
 
 #### 🎯 Nouvelles Sécurités Implémentées
 
@@ -33,6 +110,7 @@ Backend Node.js/Express pour l'application de gestion commerciale Lotus Business
 
 4. **Protection Route Admin/Create**
    - Système de bootstrap : premier admin public, suivants protégés
+   - Routes séparées : `/admin/create` (bootstrap) et `/admin/admins` (protégé)
    - Vérification authentification admin pour création d'admins supplémentaires
    - **Impact** : Impossible de créer des admins arbitrairement
 

@@ -14,6 +14,7 @@ const downloadRoutes = require('./routes/downloads');
 const legalRoutes = require('./routes/legal');
 const publicRoutes = require('./routes/public');
 const deviceRoutes = require('./routes/devices');
+const backupRoutes = require('./routes/backups');
 const { checkExpiredLicenses } = require('./lib/checkExpiredLicenses');
 
 // Initialisation de l'app
@@ -70,6 +71,7 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/documents', documentRoutes);
 app.use('/api/downloads', downloadRoutes);
 app.use('/api/devices', deviceRoutes);
+app.use('/api/backups', backupRoutes);
 // Routes légales (CGU / Privacy)
 app.use('/', legalRoutes);
 

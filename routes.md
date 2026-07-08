@@ -10,12 +10,13 @@ Ce document liste toutes les routes disponibles dans le backend de Lotus Busines
 2. [Routes d'Authentification](#routes-dauthentification)
 3. [Routes Utilisateur](#routes-utilisateur)
 4. [Routes Admin](#routes-admin)
-5. [Routes Devices](#routes-devices)
-6. [Routes Notifications](#routes-notifications)
-7. [Routes Documents](#routes-documents)
-8. [Routes Téléchargements](#routes-téléchargements)
-9. [Routes Légales](#routes-légales)
-10. [Routes Activité](#routes-activité)
+5. [Routes Backups Cloud](#routes-backups-cloud)
+6. [Routes Devices](#routes-devices)
+7. [Routes Notifications](#routes-notifications)
+8. [Routes Documents](#routes-documents)
+9. [Routes Téléchargements](#routes-téléchargements)
+10. [Routes Légales](#routes-légales)
+11. [Routes Activité](#routes-activité)
 
 ---
 
@@ -30,6 +31,11 @@ Ce document liste toutes les routes disponibles dans le backend de Lotus Busines
 - **Description**: Health check pour monitoring (UptimeRobot)
 - **Auth requise**: Non
 - **Réponse**: `{ status: "ok", timestamp, uptime }`
+
+### GET `/api/admin/deployment-check`
+- **Description**: Vérifier le déploiement et les routes admin
+- **Auth requise**: Non
+- **Réponse**: `{ status, timestamp, routes, commit, message }`
 
 ### GET `/api/public/infos`
 - **Description**: Récupérer toutes les infos publiées avec statistiques de réactions
@@ -238,6 +244,45 @@ Ce document liste toutes les routes disponibles dans le backend de Lotus Busines
 - **Body**: `{ userId }`
 - **Réponse**: `{ message }`
 
+---
+
+## ☁️ Routes Backups Cloud
+
+### POST `/api/backups/upload`
+- **Description**: Upload un backup de base de données (.db)
+- **Auth requise**: Oui (User ou Admin)
+- **Content-Type**: `multipart/form-data`
+- **Body**: 
+  - `backup` (file): Fichier .db (max 50 MB)
+  - `fileName` (text): Nom du fichier
+  - `deviceId` (text, optionnel): ID de l'appareil
+  - `deviceName` (text, optionnel): Nom de l'appareil
+  - `metadata` (text, optionnel): JSON metadata
+- **Réponse FREE**: `{ message: "Backup sauvegardé. Passez à PREMIUM pour y accéder.", backup: { id, fileName, fileSize, isAccessible: false, canDownload: false }, isPremium: false, upgradeMessage }`
+- **Réponse PREMIUM**: `{ message: "Backup sauvegardé et accessible dans le cloud", backup: { id, fileName, fileSize, isAccessible: true, canDownload: true }, isPremium: true }`
+
+### GET `/api/backups/my-backups`
+- **Description**: Lister tous les backups de l'utilisateur
+- **Auth requise**: Oui (User ou Admin)
+- **Réponse FREE**: `{ backups: [{ id, fileName, fileSize, uploadedAt, canDownload: false, downloadUrl: null, ... }], isPremium: false, totalBackups, accessibleBackups: 0, upgradeMessage }`
+- **Réponse PREMIUM**: `{ backups: [{ id, fileName, fileSize, uploadedAt, canDownload: true, downloadUrl: "/api/backups/:id/download", ... }], isPremium: true, totalBackups, accessibleBackups }`
+
+### GET `/api/backups/:backupId/download`
+- **Description**: Télécharger un backup spécifique
+- **Auth requise**: Oui (User ou Admin)
+- **Réponse FREE**: `403 Forbidden - { error: "Accès refusé", message: "Cette fonctionnalité est réservée aux utilisateurs PREMIUM.", upgradeRequired: true, upgradeUrl: "/upgrade-premium" }`
+- **Réponse PREMIUM**: `{ message: "Lien de téléchargement généré", downloadUrl: "https://...", fileName, fileSize, expiresIn: 3600 }`
+
+### DELETE `/api/backups/:backupId`
+- **Description**: Supprimer un backup
+- **Auth requise**: Oui (User ou Admin)
+- **Réponse**: `{ message: "Backup supprimé avec succès" }`
+
+### POST `/api/backups/grant-access` [ADMIN]
+- **Description**: Accorder l'accès à un backup pour un utilisateur FREE (après paiement)
+- **Auth requise**: Oui (Admin uniquement)
+- **Body**: `{ backupId, userId }`
+- **Réponse**: `{ message: "Accès au backup accordé", backup: { id, isAccessible: true, accessGrantedAt, ... } }`
 
 ---
 

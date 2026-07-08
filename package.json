@@ -18,6 +18,7 @@
     "test:infos": "node test-infos-notifications.js",
     "test:image-upload": "node test-image-upload.js",
     "create:admin": "node create-admin-hash.js",
+    "setup:bucket": "node setup-supabase-bucket.js",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
@@ -35,6 +36,7 @@
     "@getbrevo/brevo": "^6.0.1",
     "@mistralai/mistralai": "^2.2.6",
     "@prisma/client": "^5.22.0",
+    "@supabase/supabase-js": "^2.110.1",
     "axios": "^1.18.0",
     "bcrypt": "^6.0.0",
     "cors": "^2.8.5",
@@ -45,6 +47,7 @@
     "groq-sdk": "^1.2.1",
     "imagekit": "^6.0.0",
     "jsonwebtoken": "^9.0.2",
+    "multer": "^2.2.0",
     "nodemailer": "^9.0.0",
     "uuid": "^14.0.0",
     "zod": "^4.4.3"

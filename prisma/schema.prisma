@@ -85,6 +85,7 @@ model User {
   notifications    Notification[]
   activityLogs     ActivityLog[]         @relation("ActivityTarget")
   devices          Device[]
+  backups          UserBackup[]          @relation("UserBackups")
 
   @@map("users")
 }
@@ -223,4 +224,23 @@ model Device {
   @@index([userId])
   @@index([deviceId])
   @@map("devices")
+}
+
+model UserBackup {
+  id              String    @id @default(cuid())
+  userId          String
+  user            User      @relation("UserBackups", fields: [userId], references: [id], onDelete: Cascade)
+  fileName        String    // Nom du fichier (ex: "backup_2026-07-08.db")
+  fileSize        Int       // Taille en bytes
+  fileUrl         String?   // URL Supabase Storage (null si FREE et jamais accédé)
+  uploadedAt      DateTime  @default(now())
+  deviceId        String?   // Appareil d'origine du backup
+  deviceName      String?   // Nom de l'appareil
+  isAccessible    Boolean   @default(false) // true pour PREMIUM, false pour FREE
+  accessGrantedAt DateTime? // Date d'accès accordé (si FREE upgrade vers PREMIUM)
+  metadata        Json?     // Métadonnées additionnelles (version app, etc.)
+
+  @@index([userId])
+  @@index([uploadedAt])
+  @@map("user_backups")
 }
