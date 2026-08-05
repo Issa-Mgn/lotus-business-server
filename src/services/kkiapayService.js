@@ -1,117 +1,112 @@
-const kkiapaySDK = require('kkiapay');
+const axios = require('axios');
 
 /**
- * Service KKiaPay - Intégration via SDK officiel
- * Documentation: https://docs.kkiapay.me/
- * SDK: https://github.com/kkiapay/nodejs-sdk
+ * Service KKiaPay - Appels REST directs
+ * Le SDK kkiapay (npm) est un SDK browser, inutilisable en Node.js.
+ * On utilise directement l'API REST de KKiaPay.
+ *
+ * Doc: https://docs.kkiapay.me
+ * Endpoint: https://api.kkiapay.me
  */
 
-let _client = null;
+const BASE_URL = 'https://api.kkiapay.me';
 
-/**
- * Retourne le client KKiaPay (lazy init)
- */
-function getClient() {
-  if (_client) return _client;
+function getHeaders() {
+  return {
+    'x-private-key': process.env.KKIAPAY_PRIVATE_KEY,
+    'Content-Type': 'application/json',
+  };
+}
 
-  const publicKey  = process.env.KKIAPAY_PUBLIC_KEY;
-  const privateKey = process.env.KKIAPAY_PRIVATE_KEY;
-  const secret     = process.env.KKIAPAY_SECRET;
-  const sandbox    = process.env.KKIAPAY_SANDBOX === 'true';
-
-  if (!publicKey || !privateKey || !secret) {
-    throw new Error('KKiaPay non configuré. Vérifiez KKIAPAY_PUBLIC_KEY, KKIAPAY_PRIVATE_KEY et KKIAPAY_SECRET dans .env');
-  }
-
-  // Le SDK accepte les clés positionnelles: (publickey, privatekey, secretkey, sandbox)
-  _client = kkiapaySDK(privateKey, publicKey, secret, sandbox);
-
-  console.log(`[KKiaPay] Client initialisé (sandbox=${sandbox})`);
-  return _client;
+function isConfigured() {
+  return !!(
+    process.env.KKIAPAY_PUBLIC_KEY &&
+    process.env.KKIAPAY_PRIVATE_KEY &&
+    process.env.KKIAPAY_SECRET
+  );
 }
 
 /**
- * Vérifie qu'une transaction est réellement SUCCESS côté KKiaPay
+ * Vérifie le statut d'une transaction via l'API KKiaPay
  * @param {string} transactionId
  */
 async function verifyTransaction(transactionId) {
   try {
-    const client = getClient();
-    const result = await client.verify(transactionId);
+    if (!isConfigured()) {
+      throw new Error('KKiaPay non configuré. Vérifiez KKIAPAY_PRIVATE_KEY dans .env');
+    }
 
-    console.log('[KKiaPay] Résultat vérification:', JSON.stringify(result));
+    console.log('[KKiaPay] Vérification transaction:', transactionId);
 
-    // Le SDK renvoie un objet avec status, amount, etc.
-    const isPaid = result.status === 'SUCCESS';
+    const response = await axios.get(
+      `${BASE_URL}/api/v1/transactions/${transactionId}/status`,
+      { headers: getHeaders() }
+    );
+
+    const data = response.data;
+    console.log('[KKiaPay] Réponse:', JSON.stringify(data));
+
+    const isPaid = data.status === 'SUCCESS';
 
     return {
       success: true,
       isPaid,
-      status: result.status,
-      transaction: result,
+      status: data.status,
+      amount: data.amount,
+      transaction: data,
     };
   } catch (error) {
-    console.error('[KKiaPay] Erreur vérification:', error.message || error);
+    const status  = error.response?.status;
+    const message = error.response?.data?.message || error.message;
+
+    console.error(`[KKiaPay] Erreur vérification (HTTP ${status}):`, message);
+
     return {
       success: false,
       isPaid: false,
-      error: error.message || String(error),
+      error: message,
+      httpStatus: status,
     };
   }
 }
 
 /**
- * Calcule le montant selon le type d'abonnement
- */
-function getSubscriptionAmount(subscriptionType) {
-  return subscriptionType === 'ANNUAL' ? 10000 : 999;
-}
-
-/**
- * Calcule la nouvelle date d'expiration
- */
-function calculateExpirationDate(currentDate, subscriptionType) {
-  const newDate = new Date(currentDate);
-  if (subscriptionType === 'ANNUAL') {
-    newDate.setFullYear(newDate.getFullYear() + 1);
-  } else {
-    newDate.setMonth(newDate.getMonth() + 1);
-  }
-  return newDate;
-}
-
-/**
- * Vérifie la signature d'un webhook KKiaPay
- * Le SDK KKiaPay envoie un payload signé avec le secret
+ * Vérifie la signature d'un webhook KKiaPay (HMAC-SHA256)
  */
 function verifyWebhookSignature(signature, payload) {
   try {
     const crypto = require('crypto');
     const secret = process.env.KKIAPAY_SECRET;
-    if (!secret) return false;
+    if (!secret || !signature) return false;
 
-    const hash = crypto
-      .createHmac('sha256', secret)
-      .update(typeof payload === 'string' ? payload : JSON.stringify(payload))
-      .digest('hex');
+    const body = typeof payload === 'string' ? payload : JSON.stringify(payload);
+    const hash = crypto.createHmac('sha256', secret).update(body).digest('hex');
 
     return hash === signature;
-  } catch (error) {
-    console.error('[KKiaPay] Erreur vérification signature:', error);
+  } catch (err) {
+    console.error('[KKiaPay] Erreur signature:', err.message);
     return false;
   }
 }
 
+function getSubscriptionAmount(subscriptionType) {
+  return subscriptionType === 'ANNUAL' ? 10000 : 999;
+}
+
+function calculateExpirationDate(currentDate, subscriptionType) {
+  const d = new Date(currentDate);
+  if (subscriptionType === 'ANNUAL') {
+    d.setFullYear(d.getFullYear() + 1);
+  } else {
+    d.setMonth(d.getMonth() + 1);
+  }
+  return d;
+}
+
 module.exports = {
   verifyTransaction,
+  verifyWebhookSignature,
   getSubscriptionAmount,
   calculateExpirationDate,
-  verifyWebhookSignature,
-  isConfigured: () => {
-    return !!(
-      process.env.KKIAPAY_PUBLIC_KEY &&
-      process.env.KKIAPAY_PRIVATE_KEY &&
-      process.env.KKIAPAY_SECRET
-    );
-  },
+  isConfigured,
 };
