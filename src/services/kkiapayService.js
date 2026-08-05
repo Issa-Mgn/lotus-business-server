@@ -73,7 +73,7 @@ class KKiapayService {
       });
 
       const response = await axios.post(
-        `${this.baseUrl}/api/v1/transaction/initialize`,
+        `${this.baseUrl}/api/v1/transactions/init`,
         payload,
         { headers: this.getHeaders() }
       );
@@ -110,7 +110,7 @@ class KKiapayService {
       console.log('[KKiaPay] Vérification paiement:', transactionId);
 
       const response = await axios.get(
-        `${this.baseUrl}/api/v1/transaction/${transactionId}`,
+        `${this.baseUrl}/api/v1/transactions/${transactionId}`,
         { headers: this.getHeaders() }
       );
 
