@@ -88,6 +88,7 @@ model User {
   backups          UserBackup[]          @relation("UserBackups")
   payments         Payment[]             @relation("UserPayments")
   paymentTransactions PaymentTransaction[] @relation("UserPaymentTransactions")
+  shop             Shop?                 @relation("UserShop")
 
   @@map("users")
 }
@@ -307,4 +308,43 @@ model PaymentTransaction {
   @@index([status])
   @@index([createdAt])
   @@map("payment_transactions")
+}
+
+// ─── Espace Marketing ────────────────────────────────────────────────────────
+
+model Shop {
+  id            String    @id @default(cuid())
+  userId        String    @unique
+  user          User      @relation("UserShop", fields: [userId], references: [id], onDelete: Cascade)
+  name          String                        // Nom de la boutique
+  description   String?                       // Description optionnelle
+  orderPhone    String                        // Numéro par défaut pour les commandes
+  logoUrl       String?                       // Logo boutique (ImageKit)
+  logoFileId    String?
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  products      Product[]
+
+  @@map("shops")
+}
+
+model Product {
+  id            String    @id @default(cuid())
+  shopId        String
+  shop          Shop      @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  name          String                        // Nom de l'article
+  description   String?                       // Description optionnelle
+  price         Float                         // Prix en FCFA
+  category      String                        // Catégorie
+  imageUrl      String?                       // Image produit (ImageKit)
+  imageFileId   String?
+  orderPhone    String?                       // Surcharge du numéro boutique (optionnel)
+  isAvailable   Boolean   @default(true)      // Disponible à la commande
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([shopId])
+  @@index([category])
+  @@map("products")
 }

@@ -87,28 +87,24 @@ const getAllLogs = async (req, res) => {
  */
 const getLogsStats = async (req, res) => {
   try {
-    const totalLogs = await prisma.activityLog.count();
+    const now = new Date();
+    const startOfDay  = new Date(now); startOfDay.setHours(0, 0, 0, 0);
+    const startOfWeek = new Date(now); startOfWeek.setDate(now.getDate() - now.getDay()); startOfWeek.setHours(0, 0, 0, 0);
 
-    const last24h = await prisma.activityLog.count({
-      where: {
-        createdAt: {
-          gte: new Date(Date.now() - 24 * 60 * 60 * 1000),
-        },
-      },
-    });
-
-    const byType = await prisma.activityLog.groupBy({
-      by: ['type'],
-      _count: true,
-    });
+    const [total, today, thisWeek, byType] = await Promise.all([
+      prisma.activityLog.count(),
+      prisma.activityLog.count({ where: { createdAt: { gte: startOfDay } } }),
+      prisma.activityLog.count({ where: { createdAt: { gte: startOfWeek } } }),
+      prisma.activityLog.groupBy({ by: ['type'], _count: true }),
+    ]);
 
     res.json({
-      totalLogs,
-      last24h,
-      byType: byType.map(item => ({
-        type: item.type,
-        count: item._count,
-      })),
+      stats: {
+        total,
+        today,
+        thisWeek,
+        byType: byType.map(item => ({ type: item.type, count: item._count })),
+      },
     });
   } catch (error) {
     console.error('Erreur stats logs:', error);
