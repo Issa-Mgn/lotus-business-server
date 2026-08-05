@@ -47,6 +47,7 @@
     "groq-sdk": "^1.2.1",
     "imagekit": "^6.0.0",
     "jsonwebtoken": "^9.0.2",
+    "kkiapay": "^2.0.38",
     "multer": "^2.2.0",
     "nodemailer": "^9.0.0",
     "uuid": "^14.0.0",

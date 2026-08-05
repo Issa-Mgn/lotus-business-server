@@ -1,38 +1,36 @@
 const express = require('express');
-const router = express.Router();
+const router  = express.Router();
 const paymentController = require('../controllers/paymentController');
-const auth = require('../middlewares/auth');
+const auth    = require('../middlewares/auth');
 const isAdmin = require('../middlewares/isAdmin');
 
 /**
  * Routes utilisateur (authentification requise)
+ *
+ * FLOW KKiaPay:
+ *  1. App mobile: ouvre le widget KKiaPay avec KKIAPAY_PUBLIC_KEY
+ *  2. Utilisateur paie → KKiaPay retourne un transactionId
+ *  3. App appelle POST /api/payments/verify-and-upgrade avec le transactionId
+ *  4. Backend vérifie via SDK et fait l'upgrade automatiquement
  */
 
-// Créer un paiement
-router.post('/create', auth, paymentController.createPayment);
-
-// Vérifier le statut d'un paiement
-router.get('/verify/:transactionId', auth, paymentController.verifyPayment);
+// Vérifier un paiement et upgrader (principal endpoint pour l'app mobile)
+router.post('/verify-and-upgrade', auth, paymentController.verifyAndUpgrade);
 
 // Historique des paiements de l'utilisateur
 router.get('/history', auth, paymentController.getPaymentHistory);
 
 /**
- * Webhook KKiaPay (public, mais avec vérification de signature)
+ * Webhook KKiaPay (public, avec vérification de signature)
+ * KKiaPay appelle automatiquement cette URL après chaque paiement
  */
 router.post('/webhook', paymentController.handleWebhook);
 
 /**
- * Routes admin (authentification admin requise)
+ * Routes admin
  */
-
-// Récupérer tous les paiements
-router.get('/admin/all', auth, isAdmin, paymentController.getAllPayments);
-
-// Récupérer toutes les transactions (auto + manuelles)
 router.get('/admin/transactions', auth, isAdmin, paymentController.getAllTransactions);
-
-// Accorder l'accès à un backup manuellement
+router.get('/admin/all',          auth, isAdmin, paymentController.getAllPayments);
 router.post('/admin/grant-backup-access', auth, isAdmin, paymentController.grantBackupAccess);
 
 module.exports = router;
