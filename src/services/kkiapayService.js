@@ -13,7 +13,7 @@ class KKiapayService {
     this.sandbox = process.env.KKIAPAY_SANDBOX === 'true';
     
     this.baseUrl = this.sandbox 
-      ? 'https://api-sandbox.kkiapay.me' 
+      ? 'https://api-preprod.kkiapay.me' 
       : 'https://api.kkiapay.me';
   }
 
