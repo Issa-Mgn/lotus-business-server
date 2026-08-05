@@ -11,12 +11,13 @@ Ce document liste toutes les routes disponibles dans le backend de Lotus Busines
 3. [Routes Utilisateur](#routes-utilisateur)
 4. [Routes Admin](#routes-admin)
 5. [Routes Backups Cloud](#routes-backups-cloud)
-6. [Routes Devices](#routes-devices)
-7. [Routes Notifications](#routes-notifications)
-8. [Routes Documents](#routes-documents)
-9. [Routes Téléchargements](#routes-téléchargements)
-10. [Routes Légales](#routes-légales)
-11. [Routes Activité](#routes-activité)
+6. [Routes Paiements](#routes-paiements)
+7. [Routes Devices](#routes-devices)
+8. [Routes Notifications](#routes-notifications)
+9. [Routes Documents](#routes-documents)
+10. [Routes Téléchargements](#routes-téléchargements)
+11. [Routes Légales](#routes-légales)
+12. [Routes Activité](#routes-activité)
 
 ---
 
@@ -286,6 +287,194 @@ Ce document liste toutes les routes disponibles dans le backend de Lotus Busines
 
 ---
 
+## 💳 Routes Paiements
+
+### POST `/api/payments/create`
+- **Description**: Créer une intention de paiement (KKiaPay)
+- **Auth requise**: Oui (User)
+- **Body**: 
+  ```json
+  {
+    "type": "UPGRADE_PREMIUM" | "RENEW_PREMIUM" | "BACKUP_ACCESS",
+    "subscriptionType": "MONTHLY" | "ANNUAL", // Requis pour UPGRADE/RENEW
+    "backupId": "clxxx...", // Requis pour BACKUP_ACCESS
+    "phone": "+22990000000" // Optionnel
+  }
+  ```
+- **Réponse**: 
+  ```json
+  {
+    "message": "Paiement initialisé",
+    "payment": {
+      "id": "clxxx...",
+      "userId": "xxx",
+      "amount": 999,
+      "type": "UPGRADE_PREMIUM",
+      "status": "PENDING",
+      "transactionId": "kkiapay_xxx"
+    },
+    "transactionId": "kkiapay_xxx",
+    "paymentUrl": "https://pay.kkiapay.me/xxx"
+  }
+  ```
+- **Tarification**:
+  - Premium Mensuel: **999 FCFA**
+  - Premium Annuel: **10 000 FCFA**
+  - Accès Backup: **999 FCFA**
+
+### GET `/api/payments/verify/:transactionId`
+- **Description**: Vérifier le statut d'un paiement
+- **Auth requise**: Oui (User ou Admin)
+- **Réponse**: 
+  ```json
+  {
+    "message": "Paiement confirmé",
+    "payment": {
+      "id": "clxxx...",
+      "status": "SUCCESS",
+      "completedAt": "2026-08-02T10:00:00.000Z",
+      "method": "wave"
+    },
+    "status": "SUCCESS"
+  }
+  ```
+
+### GET `/api/payments/history`
+- **Description**: Historique des paiements de l'utilisateur connecté
+- **Auth requise**: Oui (User)
+- **Réponse**: 
+  ```json
+  {
+    "count": 3,
+    "payments": [
+      {
+        "id": "clxxx...",
+        "amount": 999,
+        "type": "UPGRADE_PREMIUM",
+        "status": "SUCCESS",
+        "method": "wave",
+        "createdAt": "2026-08-02T10:00:00.000Z",
+        "completedAt": "2026-08-02T10:05:00.000Z"
+      }
+    ]
+  }
+  ```
+
+### POST `/api/payments/webhook`
+- **Description**: Webhook KKiaPay pour notifications de paiement (automatique)
+- **Auth requise**: Non (vérification de signature HMAC-SHA256)
+- **Headers**: `X-KKiaPay-Signature: sha256_signature`
+- **Body**: Payload KKiaPay (transactionId, status, amount, method, metadata, etc.)
+- **Réponse**: `{ message: "Webhook traité avec succès" }`
+- **Sécurité**: 
+  - ✅ Vérification de signature webhook
+  - ✅ Vérification du statut réel via API KKiaPay (ne fait pas confiance au webhook seul)
+  - ✅ Idempotence : une transaction n'est traitée qu'une seule fois
+- **Actions automatiques** :
+  1. Vérifie signature HMAC-SHA256
+  2. Vérifie transactionId non déjà traité (idempotence)
+  3. Vérifie statut réel auprès de KKiaPay API
+  4. Upgrade utilisateur vers PREMIUM
+  5. Rend tous les backups accessibles
+  6. Crée PaymentTransaction (traçabilité)
+  7. Envoie notification in-app
+  8. Envoie email de confirmation
+  9. Log dans ActivityLog (source: AUTO_KKIAPAY)
+- **Note**: 
+  - Cette route est appelée automatiquement par KKiaPay lors de la confirmation d'un paiement
+  - Le userId doit être passé dans metadata lors de l'initialisation du paiement
+  - Si le paiement échoue, une transaction FAILED est créée pour analyse
+
+### GET `/api/payments/admin/all` [ADMIN]
+- **Description**: Récupérer tous les paiements (admin)
+- **Auth requise**: Oui (Admin)
+- **Query params**: `?status=SUCCESS&type=UPGRADE_PREMIUM&limit=100`
+- **Réponse**: 
+  ```json
+  {
+    "count": 50,
+    "payments": [...],
+    "stats": [
+      {
+        "status": "SUCCESS",
+        "_count": 45,
+        "_sum": { "amount": 44955 }
+      },
+      {
+        "status": "PENDING",
+        "_count": 5,
+        "_sum": { "amount": 4995 }
+      }
+    ]
+  }
+  ```
+
+### GET `/api/payments/admin/transactions` [ADMIN]
+- **Description**: Récupérer toutes les transactions de paiement (auto KKiaPay + manuelles admin)
+- **Auth requise**: Oui (Admin)
+- **Query params**: `?provider=KKIAPAY&status=SUCCESS&limit=100`
+- **Réponse**: 
+  ```json
+  {
+    "count": 75,
+    "transactions": [
+      {
+        "id": "clxxx...",
+        "userId": "xxx",
+        "provider": "KKIAPAY",
+        "transactionId": "kkiapay_xxx",
+        "amount": 999,
+        "status": "SUCCESS",
+        "subscriptionType": "MONTHLY",
+        "adminId": null,
+        "user": {
+          "email": "user@example.com",
+          "firstName": "John",
+          "lastName": "Doe",
+          "licenseType": "PREMIUM"
+        },
+        "createdAt": "2026-08-02T10:00:00.000Z"
+      },
+      {
+        "id": "clyyy...",
+        "userId": "yyy",
+        "provider": "MANUAL_ADMIN",
+        "transactionId": null,
+        "amount": 10000,
+        "status": "SUCCESS",
+        "subscriptionType": "ANNUAL",
+        "adminId": "admin_id",
+        "user": { ... },
+        "createdAt": "2026-08-01T15:00:00.000Z"
+      }
+    ],
+    "stats": [
+      { "provider": "KKIAPAY", "status": "SUCCESS", "_count": 50, "_sum": { "amount": 49950 } },
+      { "provider": "MANUAL_ADMIN", "status": "SUCCESS", "_count": 25, "_sum": { "amount": 24975 } }
+    ],
+    "totalRevenue": 74925
+  }
+  ```
+- **Note**: Permet de distinguer les paiements automatiques (KKiaPay) des upgrades manuels (admin)
+
+### POST `/api/payments/admin/grant-backup-access` [ADMIN]
+- **Description**: Accorder l'accès à un backup manuellement (sans paiement)
+- **Auth requise**: Oui (Admin)
+- **Body**: `{ backupId: "clxxx...", userId: "xxx" }`
+- **Réponse**: 
+  ```json
+  {
+    "message": "Accès au backup accordé",
+    "backup": {
+      "id": "clxxx...",
+      "isAccessible": true,
+      "accessGrantedAt": "2026-08-02T10:00:00.000Z"
+    }
+  }
+  ```
+
+---
+
 ## 📱 Routes Devices
 
 ### POST `/api/devices/register`
@@ -550,9 +739,54 @@ Système de tracking des appareils pour sécurité renforcée :
 - `IMAGEKIT_URL_ENDPOINT`: Endpoint ImageKit
 - `MISTRAL_API_KEY`: Clé API Mistral (documents)
 - `GROQ_API_KEY`: Clé API Groq (documents)
-
+- `SUPABASE_URL`: URL Supabase (backups)
+- `SUPABASE_SERVICE_KEY`: Clé service Supabase
+- `KKIAPAY_PUBLIC_KEY`: Clé publique KKiaPay
+- `KKIAPAY_PRIVATE_KEY`: Clé privée KKiaPay
+- `KKIAPAY_SECRET`: Secret KKiaPay (webhook)
+- `KKIAPAY_SANDBOX`: Mode sandbox KKiaPay (true/false)
 
 ---
 
-**Version**: 1.0.0  
-**Dernière mise à jour**: 26 juin 2026
+## 💳 Système de Paiement KKiaPay
+
+### Workflow de paiement
+
+1. **Utilisateur** : Initie un paiement via `/api/payments/create`
+2. **Backend** : Crée une intention de paiement et contacte KKiaPay
+3. **KKiaPay** : Retourne un `transactionId` et `paymentUrl`
+4. **App Mobile** : Ouvre l'interface de paiement KKiaPay (SDK)
+5. **Utilisateur** : Effectue le paiement (Wave, MTN, Orange, Moov, Visa, Mastercard)
+6. **KKiaPay** : Envoie un webhook au backend lors de la confirmation
+7. **Backend** : Traite le webhook et met à jour l'utilisateur
+8. **App Mobile** : Vérifie le statut via `/api/payments/verify/:transactionId`
+
+### Actions automatiques après paiement réussi
+
+- **UPGRADE_PREMIUM** : 
+  - Passe l'utilisateur en PREMIUM
+  - Définit la date d'expiration (1 mois ou 1 an)
+  - Active connexions illimitées (maxSimultaneousLogins = 999)
+  - Rend tous les backups accessibles
+  
+- **RENEW_PREMIUM** :
+  - Prolonge la date d'expiration existante
+  - Réactive le statut ACTIVE si expiré
+  
+- **BACKUP_ACCESS** :
+  - Rend le backup spécifique accessible
+  - L'utilisateur FREE peut télécharger ce backup uniquement
+
+### Documentation complète
+
+Voir `KKIAPAY_INTEGRATION.md` pour :
+- Guide d'intégration mobile (React Native)
+- Configuration du webhook
+- Tests et débogage
+- Sécurité et validation
+- Exemples de code complets
+
+---
+
+**Version**: 1.1.0  
+**Dernière mise à jour**: 2 août 2026

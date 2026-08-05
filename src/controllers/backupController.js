@@ -246,9 +246,8 @@ const downloadBackup = async (req, res) => {
     }
 
     // Générer une URL signée temporaire (valide 1 heure)
-    const filePath = backup.fileName.startsWith(`${userId}/`) 
-      ? backup.fileName 
-      : `${userId}/${backup.fileName}`;
+    // Le fileName contient déjà le chemin complet: userId/timestamp_filename.db
+    const filePath = backup.fileName;
     
     console.log('[downloadBackup] Tentative de récupération du fichier:', filePath);
     
@@ -321,7 +320,8 @@ const deleteBackup = async (req, res) => {
     }
 
     // Supprimer de Supabase Storage
-    const filePath = `${userId}/${backup.fileName}`;
+    // Le fileName contient déjà le chemin complet: userId/timestamp_filename.db
+    const filePath = backup.fileName;
     const { error: deleteError } = await supabase.storage
       .from(BACKUP_BUCKET)
       .remove([filePath]);
@@ -367,7 +367,8 @@ const grantBackupAccess = async (req, res) => {
     }
 
     // Générer une URL signée et marquer comme accessible
-    const filePath = `${userId}/${backup.fileName}`;
+    // Le fileName contient déjà le chemin complet: userId/timestamp_filename.db
+    const filePath = backup.fileName;
     const { data: urlData } = await supabase.storage
       .from(BACKUP_BUCKET)
       .createSignedUrl(filePath, 315360000); // 10 ans

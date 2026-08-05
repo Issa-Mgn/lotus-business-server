@@ -4,15 +4,102 @@ Backend Node.js/Express pour l'application de gestion commerciale Lotus Business
 
 ---
 
-## 🆕 Dernières Mises à Jour (Juillet 2026)
+## 🆕 Dernières Mises à Jour (Août 2026)
 
-### ☁️ Système de Cloud Backup - Nouvelle Fonctionnalité Majeure
+### 💳 Intégration KKiaPay - Paiements Mobiles (v1.2)
+
+**2 août 2026** : Intégration complète de KKiaPay pour les paiements mobiles. Système de paiement sécurisé avec webhook pour automatiser les upgrades et accès backups.
+
+#### 🎯 Fonctionnalités de Paiement
+
+**Méthodes de paiement supportées** :
+- 📱 **Mobile Money** : Wave, Orange Money, MTN, Moov
+- 💳 **Cartes bancaires** : Visa, Mastercard
+
+**Types de paiements** :
+1. **UPGRADE_PREMIUM** : Passer de FREE à PREMIUM
+   - Mensuel : **999 FCFA/mois**
+   - Annuel : **10 000 FCFA/an**
+2. **RENEW_PREMIUM** : Renouveler l'abonnement PREMIUM
+3. **BACKUP_ACCESS** : Acheter l'accès à un backup (999 FCFA)
+
+#### 🔧 Routes API Paiements
+
+```http
+POST   /api/payments/create                      # Créer un paiement
+GET    /api/payments/verify/:transactionId       # Vérifier un paiement
+GET    /api/payments/history                     # Historique utilisateur
+POST   /api/payments/webhook                     # Webhook KKiaPay
+GET    /api/payments/admin/all                   # [ADMIN] Tous les paiements
+POST   /api/payments/admin/grant-backup-access   # [ADMIN] Accorder accès backup
+```
+
+#### ⚙️ Configuration KKiaPay
+
+Variables d'environnement :
+```env
+KKIAPAY_PUBLIC_KEY=pk_xxxxxxxxxxxxxxxxxxxxx
+KKIAPAY_PRIVATE_KEY=sk_xxxxxxxxxxxxxxxxxxxxx
+KKIAPAY_SECRET=secret_xxxxxxxxxxxxxxxxxxxxx
+KKIAPAY_SANDBOX=true  # false en production
+```
+
+**URL Webhook à configurer** : `https://votre-domaine.com/api/payments/webhook`
+
+#### 🔄 Workflow de Paiement
+
+1. **App Mobile** → Appelle `/api/payments/create` avec type et montant
+2. **Backend** → Crée intention de paiement via KKiaPay
+3. **Backend** → Retourne `transactionId` et `paymentUrl`
+4. **App Mobile** → Ouvre SDK KKiaPay pour paiement
+5. **Utilisateur** → Effectue le paiement (Wave, MTN, etc.)
+6. **KKiaPay** → Envoie webhook de confirmation au backend
+7. **Backend** → Traite webhook, upgrade utilisateur automatiquement
+8. **App Mobile** → Vérifie statut via `/api/payments/verify/:transactionId`
+
+#### ✨ Actions Automatiques Post-Paiement
+
+- **UPGRADE_PREMIUM** :
+  - ✅ Passe l'utilisateur en PREMIUM
+  - ✅ Définit date d'expiration (1 mois ou 1 an)
+  - ✅ Active connexions illimitées
+  - ✅ Rend tous les backups accessibles
+
+- **RENEW_PREMIUM** :
+  - ✅ Prolonge la date d'expiration
+  - ✅ Réactive si expiré
+
+- **BACKUP_ACCESS** :
+  - ✅ Rend le backup spécifique téléchargeable
+  - ✅ Utilisateur FREE peut récupérer ses données
+
+#### 📊 Base de Données
+
+Nouveau modèle `Payment` avec :
+- Montant, type, statut (PENDING/SUCCESS/FAILED)
+- Transaction ID KKiaPay
+- Méthode de paiement
+- Métadonnées (backupId, subscriptionType, etc.)
+- Timestamps (création, complétion)
+
+#### 📝 Documentation Complète
+
+- `KKIAPAY_INTEGRATION.md` - Guide d'intégration complet
+- Exemples React Native
+- Configuration webhook
+- Tests et sécurité
+
+---
+
+### ☁️ Système de Cloud Backup - Nouvelle Fonctionnalité Majeure (v1.1)
+
+**Correctif 8 juillet 2026** : Problème de chemin de fichier résolu dans le téléchargement de backups. Le système stocke maintenant correctement le chemin complet `userId/timestamp_filename.db` et l'utilise directement sans reconstruction. Voir [BACKUP_FIX_SUMMARY.md](./BACKUP_FIX_SUMMARY.md) pour les détails.
 
 #### 🎯 Concept Marketing Innovant
 
 Un système de sauvegarde cloud avec stratégie freemium :
-- **Utilisateurs FREE** : Données sauvegardées automatiquement mais **pas d'accès** (doivent upgrader pour récupérer)
-- **Utilisateurs PREMIUM** : Peuvent synchroniser et restaurer leurs données à volonté
+- **Utilisateurs FREE** : Données sauvegardées automatiquement mais **pas d'accès** (doivent upgrader pour récupérer soit payer pour pouvoir juste télécharger les données si un le téléphone est perdu)
+- **Utilisateurs PREMIUM** : Peuvent synchroniser et restaurer leurs données à volonté et ils ont égalment accès à d'utres fonctionnalités premium comme le convertisseur...
 - **Stockage** : Supabase Storage (bucket privé `user-backups`)
 - **Format** : Fichiers `.db` (SQLite) jusqu'à 50 MB
 

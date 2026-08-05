@@ -127,32 +127,82 @@ const upgradeToPremium = async (req, res) => {
 
     const newExpirationDate = new Date();
     let message = '';
+    let amount = 0;
 
     if (subscriptionType === 'ANNUAL') {
       // Abonnement annuel : 10000 FCFA/an
       newExpirationDate.setFullYear(newExpirationDate.getFullYear() + 1);
       message = 'User upgradé en PREMIUM ANNUEL (10000 FCFA/an)';
+      amount = 10000;
     } else {
       // Abonnement mensuel : 999 FCFA/mois
       newExpirationDate.setMonth(newExpirationDate.getMonth() + 1);
       message = 'User upgradé en PREMIUM MENSUEL (999 FCFA/mois)';
+      amount = 999;
     }
 
-    const updatedUser = await prisma.user.update({
-      where: { id: userId },
-      data: {
-        licenseType: 'PREMIUM',
-        licenseStatus: 'ACTIVE',
-        subscriptionType: subscriptionType,
-        activationDate: new Date(),
-        expirationDate: newExpirationDate,
-        maxSimultaneousLogins: 999, // PREMIUM = connexions illimitées
-      },
+    // Transaction atomique : Upgrade + créer PaymentTransaction pour traçabilité
+    const result = await prisma.$transaction(async (tx) => {
+      // 1. Upgrade l'utilisateur
+      const updatedUser = await tx.user.update({
+        where: { id: userId },
+        data: {
+          licenseType: 'PREMIUM',
+          licenseStatus: 'ACTIVE',
+          subscriptionType: subscriptionType,
+          activationDate: new Date(),
+          expirationDate: newExpirationDate,
+          maxSimultaneousLogins: 999, // PREMIUM = connexions illimitées
+        },
+      });
+
+      // 2. Rendre tous les backups accessibles
+      await tx.userBackup.updateMany({
+        where: { userId, isAccessible: false },
+        data: {
+          isAccessible: true,
+          accessGrantedAt: new Date(),
+        },
+      });
+
+      // 3. Tracer l'upgrade manuel dans PaymentTransaction
+      await tx.paymentTransaction.create({
+        data: {
+          userId,
+          provider: 'MANUAL_ADMIN',
+          transactionId: null, // Pas de transaction KKiaPay
+          amount,
+          status: 'SUCCESS',
+          adminId: req.userId, // Admin qui a fait l'action
+          subscriptionType,
+          metadata: {
+            note: 'Upgrade manuel par admin',
+            adminEmail: req.userType === 'admin' ? 'admin' : 'unknown',
+          },
+        },
+      });
+
+      // 4. Activity Log
+      await tx.activityLog.create({
+        data: {
+          type: 'LICENSE_UPGRADED',
+          description: `Upgrade manuel vers PREMIUM ${subscriptionType} par admin`,
+          adminId: req.userId,
+          targetId: userId,
+          metadata: JSON.stringify({
+            source: 'MANUAL_ADMIN',
+            amount,
+            subscriptionType,
+          }),
+        },
+      });
+
+      return updatedUser;
     });
 
     res.json({
       message,
-      user: updatedUser,
+      user: result,
     });
   } catch (error) {
     console.error('Erreur upgrade:', error);

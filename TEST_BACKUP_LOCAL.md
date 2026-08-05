@@ -1,109 +1,183 @@
-# 🧪 Test du système de backup en local
+# Guide de Test - Système de Cloud Backup (Local)
 
-## Prérequis
+**Version**: 1.1  
+**Dernière mise à jour**: 8 juillet 2026  
+**Correctifs**: Problème de chemin de fichier résolu
 
-1. **Supabase configuré** avec les credentials dans `.env`
-2. **Base de données** avec le schéma mis à jour
-3. **Un fichier `.db` de test** pour uploader
+---
 
-## Étape 1 : Configurer Supabase
+## 🎯 Objectif
 
-### 1.1 Ajouter les variables dans `.env`
+Tester localement le système de cloud backup avec Postman pour vérifier que :
+- ✅ Les utilisateurs FREE peuvent uploader mais pas télécharger
+- ✅ Les utilisateurs PREMIUM peuvent uploader ET télécharger
+- ✅ Les fichiers sont correctement stockés dans Supabase Storage
+- ✅ Les chemins de fichiers sont gérés correctement (avec timestamp)
 
-```env
-SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_SERVICE_KEY=your_service_role_key_here
-```
+---
 
-### 1.2 Créer le bucket
+## 📋 Prérequis
+
+### 1. Serveur démarré
 
 ```bash
-node setup-supabase-bucket.js
+cd server
+npm run dev
+```
+
+Le serveur doit tourner sur `http://localhost:5000`
+
+### 2. Variables d'environnement configurées
+
+Vérifier que le fichier `.env` contient :
+
+```env
+SUPABASE_URL=https://votre-projet.supabase.co
+SUPABASE_SERVICE_KEY=votre_service_role_key
+```
+
+### 3. Bucket Supabase créé
+
+```bash
+npm run setup:bucket
 ```
 
 Résultat attendu :
 ```
-✅ Bucket "user-backups" créé avec succès!
+✅ Bucket 'user-backups' créé avec succès
 ```
 
-## Étape 2 : Démarrer le serveur
+### 4. Fichier de test
+
+Créer un fichier `.db` de test (ou utiliser un vrai fichier SQLite) :
 
 ```bash
-npm run dev
+# Windows
+echo. > test.db
 ```
 
-Le serveur démarre sur `http://localhost:5000`
+---
 
-## Étape 3 : Tester avec Postman
+## 🧪 Tests avec Postman
 
-### 3.1 Créer un fichier .db de test
+### Test 1 : Créer un utilisateur FREE
 
-Créer un fichier nommé `test_backup.db` (peut être vide ou contenir des données SQLite).
+**Endpoint** : `POST http://localhost:5000/api/auth/register`
 
-### 3.2 Se connecter en tant qu'utilisateur
-
-**Login utilisateur FREE :**
+**Headers** :
 ```
-POST http://localhost:5000/api/auth/login
-Body (JSON):
+Content-Type: application/json
+```
+
+**Body (raw JSON)** :
+```json
 {
-  "licenseKey": "LOT-XXXX-XXXX-XXXX"
+  "email": "free@test.com",
+  "phone": "+221771111111",
+  "firstName": "User",
+  "lastName": "FREE",
+  "licenseType": "FREE"
 }
+```
 
-Réponse:
+**Résultat attendu** :
+```json
+{
+  "message": "Inscription réussie ! Votre clé a été envoyée par email.",
+  "user": {
+    "id": "...",
+    "email": "free@test.com",
+    "licenseKey": "LOT-1234-ABCD-5678",
+    "licenseType": "FREE"
+  }
+}
+```
+
+📝 **Noter le token JWT** retourné (si présent) ou se connecter avec la clé.
+
+---
+
+### Test 2 : Connexion utilisateur FREE
+
+**Endpoint** : `POST http://localhost:5000/api/auth/login`
+
+**Body** :
+```json
+{
+  "licenseKey": "LOT-1234-ABCD-5678"
+}
+```
+
+**Résultat attendu** :
+```json
 {
   "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
   "user": { ... }
 }
 ```
 
-Copier le `token` pour les prochaines requêtes.
+📝 **Copier le token JWT FREE**
 
-### 3.3 Upload un backup (FREE)
+---
 
+### Test 3 : Upload backup (Utilisateur FREE)
+
+**Endpoint** : `POST http://localhost:5000/api/backups/upload`
+
+**Headers** :
 ```
-POST http://localhost:5000/api/backups/upload
-Headers:
-- Authorization: Bearer {token}
-- Content-Type: multipart/form-data
+Authorization: Bearer <token_FREE>
+```
 
-Body (form-data):
-- backup: [sélectionner le fichier test_backup.db]
-- fileName: "test_backup.db"
-- deviceId: "device-123"
-- deviceName: "iPhone 13"
+**Body (form-data)** :
+- Key: `backup` | Type: `File` | Value: Sélectionner `test.db`
+- Key: `fileName` | Type: `Text` | Value: `test.db`
+- Key: `deviceId` | Type: `Text` | Value: `device-123` (optionnel)
+- Key: `deviceName` | Type: `Text` | Value: `iPhone 13` (optionnel)
 
-Réponse attendue (FREE):
+**Résultat attendu** :
+```json
 {
   "message": "Backup sauvegardé. Passez à PREMIUM pour y accéder.",
   "backup": {
-    "id": "...",
-    "fileName": "test_backup.db",
-    "fileSize": 1024,
-    "uploadedAt": "2026-07-08T...",
+    "id": "cmrc43wyl0001uq53p3v6pzr9",
+    "fileName": "test.db",
+    "fileSize": 4096,
+    "uploadedAt": "2026-07-08T13:27:08.446Z",
     "isAccessible": false,
     "canDownload": false
   },
   "isPremium": false,
-  "upgradeMessage": "Passez à PREMIUM pour synchroniser..."
+  "upgradeMessage": "Passez à PREMIUM pour synchroniser et restaurer vos données à tout moment."
 }
 ```
 
-### 3.4 Lister les backups
+✅ **Vérifications** :
+- `isAccessible: false`
+- `canDownload: false`
+- Message d'upgrade présent
 
+---
+
+### Test 4 : Lister les backups (Utilisateur FREE)
+
+**Endpoint** : `GET http://localhost:5000/api/backups/my-backups`
+
+**Headers** :
 ```
-GET http://localhost:5000/api/backups/my-backups
-Headers:
-- Authorization: Bearer {token}
+Authorization: Bearer <token_FREE>
+```
 
-Réponse (FREE):
+**Résultat attendu** :
+```json
 {
   "backups": [
     {
       "id": "...",
-      "fileName": "test_backup.db",
-      "fileSize": 1024,
-      "uploadedAt": "2026-07-08T...",
+      "fileName": "test.db",
+      "fileSize": 4096,
+      "uploadedAt": "2026-07-08T13:27:08.446Z",
+      "isAccessible": false,
       "canDownload": false,
       "downloadUrl": null
     }
@@ -115,14 +189,24 @@ Réponse (FREE):
 }
 ```
 
-### 3.5 Tenter de télécharger (FREE) - DEVRAIT ÉCHOUER
+✅ **Vérifications** :
+- Backup visible dans la liste
+- `canDownload: false`
+- `downloadUrl: null`
 
+---
+
+### Test 5 : Tentative de téléchargement (Utilisateur FREE) ❌
+
+**Endpoint** : `GET http://localhost:5000/api/backups/<backupId>/download`
+
+**Headers** :
 ```
-GET http://localhost:5000/api/backups/{backupId}/download
-Headers:
-- Authorization: Bearer {token}
+Authorization: Bearer <token_FREE>
+```
 
-Réponse attendue (403):
+**Résultat attendu** :
+```json
 {
   "error": "Accès refusé",
   "message": "Cette fonctionnalité est réservée aux utilisateurs PREMIUM.",
@@ -131,35 +215,51 @@ Réponse attendue (403):
 }
 ```
 
-## Étape 4 : Tester avec utilisateur PREMIUM
+✅ **Status Code** : `403 Forbidden`
 
-### 4.1 Upgrade un utilisateur vers PREMIUM (via admin)
+---
 
-```
-POST http://localhost:5000/api/admin/upgrade-premium
-Headers:
-- Authorization: Bearer {adminToken}
+### Test 6 : Créer un utilisateur PREMIUM
 
-Body (JSON):
+**Endpoint** : `POST http://localhost:5000/api/auth/register`
+
+**Body** :
+```json
 {
-  "userId": "user-id-ici",
-  "subscriptionType": "MONTHLY"
+  "email": "premium@test.com",
+  "phone": "+221772222222",
+  "firstName": "User",
+  "lastName": "PREMIUM",
+  "licenseType": "PREMIUM"
 }
 ```
 
-### 4.2 Upload un backup (PREMIUM)
+📝 **Copier le token JWT PREMIUM** après connexion
 
-Refaire l'upload (étape 3.3) avec un utilisateur PREMIUM.
+---
 
-Réponse attendue (PREMIUM):
+### Test 7 : Upload backup (Utilisateur PREMIUM)
+
+**Endpoint** : `POST http://localhost:5000/api/backups/upload`
+
+**Headers** :
+```
+Authorization: Bearer <token_PREMIUM>
+```
+
+**Body (form-data)** :
+- Key: `backup` | Type: `File` | Value: `test.db`
+- Key: `fileName` | Type: `Text` | Value: `test.db`
+
+**Résultat attendu** :
 ```json
 {
   "message": "Backup sauvegardé et accessible dans le cloud",
   "backup": {
     "id": "...",
-    "fileName": "test_backup.db",
-    "fileSize": 1024,
-    "uploadedAt": "2026-07-08T...",
+    "fileName": "test.db",
+    "fileSize": 4096,
+    "uploadedAt": "2026-07-08T13:30:00.000Z",
     "isAccessible": true,
     "canDownload": true
   },
@@ -168,87 +268,226 @@ Réponse attendue (PREMIUM):
 }
 ```
 
-### 4.3 Télécharger un backup (PREMIUM) - DEVRAIT RÉUSSIR
+✅ **Vérifications** :
+- `isAccessible: true`
+- `canDownload: true`
+- Pas de message d'upgrade
 
+---
+
+### Test 8 : Lister les backups (Utilisateur PREMIUM)
+
+**Endpoint** : `GET http://localhost:5000/api/backups/my-backups`
+
+**Headers** :
 ```
-GET http://localhost:5000/api/backups/{backupId}/download
-Headers:
-- Authorization: Bearer {premiumToken}
+Authorization: Bearer <token_PREMIUM>
+```
 
-Réponse attendue (200):
+**Résultat attendu** :
+```json
+{
+  "backups": [
+    {
+      "id": "...",
+      "fileName": "test.db",
+      "fileSize": 4096,
+      "uploadedAt": "2026-07-08T13:30:00.000Z",
+      "isAccessible": true,
+      "canDownload": true,
+      "downloadUrl": "/api/backups/.../download"
+    }
+  ],
+  "isPremium": true,
+  "totalBackups": 1,
+  "accessibleBackups": 1,
+  "upgradeMessage": null
+}
+```
+
+✅ **Vérifications** :
+- `canDownload: true`
+- `downloadUrl` présent
+
+---
+
+### Test 9 : Téléchargement (Utilisateur PREMIUM) ✅
+
+**Endpoint** : `GET http://localhost:5000/api/backups/<backupId>/download`
+
+**Headers** :
+```
+Authorization: Bearer <token_PREMIUM>
+```
+
+**Résultat attendu** :
+```json
 {
   "message": "Lien de téléchargement généré",
-  "downloadUrl": "https://xxxx.supabase.co/storage/v1/object/sign/user-backups/...",
-  "fileName": "test_backup.db",
-  "fileSize": 1024,
+  "downloadUrl": "https://xxx.supabase.co/storage/v1/object/sign/user-backups/userId/1783516968145_test.db?token=...",
+  "fileName": "test.db",
+  "fileSize": 4096,
   "expiresIn": 3600
 }
 ```
 
-Copier le `downloadUrl` et l'ouvrir dans le navigateur pour télécharger le fichier.
+✅ **Vérifications** :
+- URL signée Supabase générée
+- Expire dans 1 heure (3600 secondes)
+- `fileName` affiché sans timestamp ni `userId/`
 
-## Étape 5 : Vérifier dans Supabase
+📌 **Copier le `downloadUrl` et l'ouvrir dans le navigateur pour télécharger le fichier**
 
-1. Aller sur https://supabase.com/dashboard
-2. Sélectionner votre projet
-3. Aller dans **Storage** → **user-backups**
-4. Vous devriez voir les dossiers par `userId` avec les fichiers `.db`
+---
 
-## Étape 6 : Test Admin - Accorder l'accès à un FREE
+### Test 10 : Supprimer un backup
 
-Simuler un utilisateur FREE qui a perdu son téléphone et paye pour récupérer ses données.
+**Endpoint** : `DELETE http://localhost:5000/api/backups/<backupId>`
 
+**Headers** :
 ```
-POST http://localhost:5000/api/backups/grant-access
-Headers:
-- Authorization: Bearer {adminToken}
+Authorization: Bearer <token_PREMIUM>
+```
 
-Body (JSON):
+**Résultat attendu** :
+```json
 {
-  "backupId": "backup-id-du-free-user",
-  "userId": "user-id-du-free-user"
+  "message": "Backup supprimé avec succès"
 }
+```
 
-Réponse:
+---
+
+### Test 11 : [ADMIN] Accorder accès à un backup FREE
+
+**Endpoint** : `POST http://localhost:5000/api/backups/grant-access`
+
+**Headers** :
+```
+Authorization: Bearer <token_ADMIN>
+```
+
+**Body** :
+```json
+{
+  "backupId": "<id_backup_FREE>",
+  "userId": "<id_user_FREE>"
+}
+```
+
+**Résultat attendu** :
+```json
 {
   "message": "Accès au backup accordé",
   "backup": {
-    ...
+    "id": "...",
     "isAccessible": true,
-    "accessGrantedAt": "2026-07-08T..."
+    "accessGrantedAt": "2026-07-08T14:00:00.000Z"
   }
 }
 ```
 
-Maintenant le FREE user peut télécharger CE backup spécifique (même s'il est toujours FREE).
+---
 
-## Checklist de validation
+## 🐛 Déboggage
 
-- [x] Bucket Supabase créé
-- [ ] Upload backup FREE → isAccessible = false
-- [ ] Upload backup PREMIUM → isAccessible = true
-- [ ] Liste backups FREE → downloadUrl = null
-- [ ] Liste backups PREMIUM → downloadUrl présent
-- [ ] Download FREE → 403 Accès refusé
-- [ ] Download PREMIUM → URL de téléchargement valide
-- [ ] Admin grant access → FREE peut télécharger le backup spécifique
-- [ ] Fichier visible dans Supabase Storage
+### Problème : "Supabase non configuré"
 
-## Dépannage
+**Cause** : Variables `SUPABASE_URL` ou `SUPABASE_SERVICE_KEY` manquantes
 
-### Erreur "Bucket not found"
+**Solution** :
+1. Vérifier le fichier `.env`
+2. Redémarrer le serveur : `npm run dev`
+
+---
+
+### Problème : "Object not found" lors du téléchargement
+
+**Cause** : Chemin de fichier incorrect (problème corrigé dans v1.1)
+
+**Solution** :
+- Le `fileName` est maintenant stocké avec le chemin complet : `userId/timestamp_filename.db`
+- Le code a été corrigé pour utiliser directement `backup.fileName` sans reconstruction
+
+**Vérification dans Supabase Storage** :
+1. Aller sur https://supabase.com/dashboard
+2. Storage → `user-backups`
+3. Vérifier que les fichiers sont dans `userId/timestamp_filename.db`
+
+---
+
+### Problème : Bucket introuvable
+
+**Cause** : Bucket pas créé dans Supabase
+
+**Solution** :
 ```bash
-node setup-supabase-bucket.js
+npm run setup:bucket
 ```
 
-### Erreur "SUPABASE_URL is not defined"
-Vérifier que les variables sont dans `.env` et redémarrer le serveur.
+Ou créer manuellement dans Supabase Dashboard :
+1. Storage → New Bucket
+2. Nom : `user-backups`
+3. Private : ✅
+4. File size limit : 50 MB
 
-### Erreur lors de l'upload
-- Vérifier que le fichier fait moins de 100 MB
-- Vérifier que l'extension est `.db`
-- Vérifier les credentials Supabase
+---
 
-### Erreur 401 lors du download
-- Vérifier que le token JWT est valide
-- Vérifier que l'utilisateur est le propriétaire du backup
+## ✅ Checklist de Test
+
+- [ ] Utilisateur FREE peut s'inscrire
+- [ ] Utilisateur FREE peut uploader un backup
+- [ ] Backup FREE marqué comme `isAccessible: false`
+- [ ] Utilisateur FREE **ne peut pas** télécharger (403)
+- [ ] Utilisateur PREMIUM peut s'inscrire
+- [ ] Utilisateur PREMIUM peut uploader un backup
+- [ ] Backup PREMIUM marqué comme `isAccessible: true`
+- [ ] Utilisateur PREMIUM **peut** télécharger (URL signée)
+- [ ] Téléchargement via URL signée fonctionne
+- [ ] Suppression de backup fonctionne
+- [ ] Admin peut accorder l'accès à un backup FREE
+- [ ] Nom de fichier affiché correctement (sans timestamp)
+
+---
+
+## 📝 Notes
+
+### Stockage des fichiers
+
+Les fichiers sont stockés dans Supabase Storage avec la structure :
+```
+user-backups/
+  └── <userId>/
+      ├── 1783516968145_test.db
+      ├── 1783517227390_backup.db
+      └── ...
+```
+
+### Base de données
+
+Table `user_backups` :
+- `fileName` : Chemin complet `userId/timestamp_filename.db`
+- `fileSize` : Taille en bytes
+- `fileUrl` : URL signée longue durée (PREMIUM) ou null (FREE)
+- `isAccessible` : `true` pour PREMIUM, `false` pour FREE
+
+### Affichage
+
+Le nom affiché à l'utilisateur est nettoyé :
+- ✅ Affiche : `test.db`
+- ❌ Ne pas afficher : `180b55e0-ce3e-4a1c-8290-24812f1e0058/1783516968145_test.db`
+
+---
+
+## 🚀 Prochaines Étapes
+
+1. ✅ Tests locaux avec Postman
+2. ⏳ Intégration dans l'app mobile (React Native)
+3. ⏳ Tests en production (Render.com + Supabase)
+4. ⏳ Interface admin pour gérer les backups
+5. ⏳ Statistiques backups dans le dashboard
+
+---
+
+**Auteur** : Lotus Business Dev Team  
+**Contact** : support@lotusbusiness.com

@@ -86,6 +86,8 @@ model User {
   activityLogs     ActivityLog[]         @relation("ActivityTarget")
   devices          Device[]
   backups          UserBackup[]          @relation("UserBackups")
+  payments         Payment[]             @relation("UserPayments")
+  paymentTransactions PaymentTransaction[] @relation("UserPaymentTransactions")
 
   @@map("users")
 }
@@ -243,4 +245,66 @@ model UserBackup {
   @@index([userId])
   @@index([uploadedAt])
   @@map("user_backups")
+}
+
+enum PaymentType {
+  UPGRADE_PREMIUM
+  RENEW_PREMIUM
+  BACKUP_ACCESS
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  REFUNDED
+}
+
+model Payment {
+  id            String        @id @default(cuid())
+  userId        String
+  user          User          @relation("UserPayments", fields: [userId], references: [id], onDelete: Cascade)
+  amount        Int           // Montant en FCFA (999 ou 10000)
+  currency      String        @default("XOF") // Franc CFA
+  type          PaymentType   // Type de paiement
+  status        PaymentStatus @default(PENDING)
+  transactionId String?       @unique // ID transaction KKiaPay
+  method        String?       // Méthode de paiement (wave, mtn, orange, moov, visa, mastercard)
+  metadata      Json?         // Données additionnelles (backupId pour BACKUP_ACCESS, etc.)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  completedAt   DateTime?     // Date de confirmation du paiement
+
+  @@index([userId])
+  @@index([transactionId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("payments")
+}
+
+enum PaymentProvider {
+  KKIAPAY
+  MANUAL_ADMIN
+}
+
+model PaymentTransaction {
+  id            String          @id @default(cuid())
+  userId        String
+  user          User            @relation("UserPaymentTransactions", fields: [userId], references: [id], onDelete: Cascade)
+  provider      PaymentProvider // KKIAPAY ou MANUAL_ADMIN
+  transactionId String?         @unique // ID transaction KKiaPay (null si MANUAL_ADMIN)
+  amount        Int             // Montant en FCFA
+  status        PaymentStatus   // PENDING, SUCCESS, FAILED
+  adminId       String?         // ID de l'admin qui a fait l'upgrade manuel (null si auto)
+  subscriptionType SubscriptionType? // MONTHLY ou ANNUAL
+  metadata      Json?           // Données additionnelles
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  
+  @@index([userId])
+  @@index([transactionId])
+  @@index([provider])
+  @@index([status])
+  @@index([createdAt])
+  @@map("payment_transactions")
 }
